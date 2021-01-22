@@ -34,7 +34,7 @@ def fit_exp_linear(x, y, C=0):
 
 #%% Iod-131
 # data path and files
-data_path = 'C:/Users/Eric/Documents/Python Scripts/half_life/Data/Iod/'
+data_path = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Iod/'
 data_files = [f for f in os.listdir(data_path) if f.endswith(".csv")]
 
 
@@ -59,7 +59,7 @@ for file in sorted_alphanumeric(data_files):
 # sum of all counts over the intervall (energy window)
 decay_sum_counts = []
 for block in counts:
-    decay_sum_counts.append(sum(block[804:809]))
+    decay_sum_counts.append(sum(block[803:810]))
 
 
 # convert time points into seconds and calculate ds

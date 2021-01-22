@@ -34,7 +34,7 @@ def fit_exp_linear(x, y, C=0):
 
 #%% Lu177m
 # data path and files
-data_path = 'C:/Users/Eric/Documents/Python Scripts/half_life/Data/Lu/'
+data_path = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Lu/'
 data_files = [f for f in os.listdir(data_path) if f.endswith(".csv")]
 
 
@@ -59,8 +59,7 @@ for file in sorted_alphanumeric(data_files):
 # sum of all counts over the intervall (energy window)
 decay_sum_counts = []
 for block in counts:
-    decay_sum_counts.append(sum(block[56:61]))
-
+    decay_sum_counts.append(sum(block[56:62]))
 
 # convert time points into seconds and calculate ds
 dates = [dt.datetime(2020,9,16), dt.datetime(2020,9,28), dt.datetime(2020,11,6), dt.datetime(2020,11,30)]
