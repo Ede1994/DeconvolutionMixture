@@ -24,7 +24,7 @@ def sorted_alphanumeric(data):
 def func(x, a, b):
     return a * np.exp(-b * x)
 
-def fit_exp_linear_iod(x, y, C=0):
+def fit_exp_linear_iod(x, y, C):
     y = y - C
     y = np.log(y)
     K, A_log = np.polyfit(x, y, 1)
@@ -65,13 +65,14 @@ for file in sorted_alphanumeric(data_files):
     j += 1
 
 
-x_min, x_max = 805, 806
+x_iod_min, x_iod_max = 803, 810
+x_lu_min, x_lu_max = 56, 62
 # sum of all counts over the intervall (energy window: Iod, Lu)
 decay_sum_counts_iod = []
 decay_sum_counts_lu = []
 for block in counts:
-    decay_sum_counts_iod.append(sum(block[x_min:x_max])/len(block[x_min:x_max])) #(sum(block[804:810]))
-    decay_sum_counts_lu.append(sum(block[56:62]))
+    decay_sum_counts_iod.append(sum(block[x_iod_min:x_iod_max])) #(sum(block[804:810]))
+    decay_sum_counts_lu.append(sum(block[x_lu_min:x_lu_max]))
 #decay_sum_counts_iod = [520.0, 377.0, 172.0, 120.0, 87.0, 80.0]
 
 
@@ -84,16 +85,15 @@ for time in dates[1:2]:
 
 for time in dates[3:]:
     ds_end.append((time-dates[0]).total_seconds())
-print(ds_end)
-
-# use exp fit function (Iod)
-A_iod, K_iod = fit_exp_linear_iod(np.asarray(ds_begin), np.asarray(decay_sum_counts_iod[0:2]))
-half_life_iod = round(np.log(2)/(-K_iod*60*60*24), 1)
 
 
 # use exp fit function (Lu)
-A_lu, K_lu = fit_exp_linear_iod(np.asarray(ds_end), np.asarray(decay_sum_counts_iod[3:]))
+A_lu, K_lu = fit_exp_linear_lu(np.asarray(ds_end), np.asarray(decay_sum_counts_lu[3:]))
 half_life_lu = round(np.log(2)/(-K_lu*60*60*24), 1)
+
+# use exp fit function (Iod)
+A_iod, K_iod = fit_exp_linear_iod(np.asarray(ds_begin), np.asarray(decay_sum_counts_iod[0:2]), A_lu)
+half_life_iod = round(np.log(2)/(-K_iod*60*60*24), 1)
 
 
 # define x axis cvalues for fit-plot
@@ -101,8 +101,13 @@ tmin, tmax = 0, max(ds_end)
 num = 20
 t = np.linspace(tmin, tmax, num)
 
-A_ges, K_ges = fit_exp_linear_iod(t, func(t, A_iod, -K_iod) + func(t, A_lu, -K_lu))
+A_ges, K_ges = fit_exp_linear_lu(t, func(t, A_iod, -K_iod) + func(t, A_lu, -K_lu))
 half_life_ges = round(np.log(2)/(-K_ges*60*60*24), 1)
+
+print('--- Results ---')
+print('Iod activity:', (round(A_iod*0.932, 2)))
+print('Lu activity:', (round(A_lu*1.018, 2)))
+print('---------------')
 
 # plot counts and fit
 fig = plt.figure()

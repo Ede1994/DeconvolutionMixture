@@ -36,6 +36,7 @@ def fit_exp_linear(x, y, C=0):
 # data path and files
 data_path = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Lu/'
 data_files = [f for f in os.listdir(data_path) if f.endswith(".csv")]
+print(data_files)
 
 
 # define lists for channels and counts
@@ -78,6 +79,7 @@ tmin, tmax = 0, ds[len(ds)-1]
 num = 20
 t = np.linspace(tmin, tmax, num)
 
+print('Conversion-Factor:', (10000/A))
 
 # plot counts and fit
 plt.title('Calculated Half-Life: ' + str(half_life) + 'd')
