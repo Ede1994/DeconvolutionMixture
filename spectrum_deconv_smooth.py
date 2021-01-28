@@ -16,12 +16,14 @@ from scipy.integrate import simps
 from scipy.signal import savgol_filter
 
 #%% functions
+
 # function for sorting lists, containing strings with numbers (https://stackoverflow.com/a/48413757)
 def sorted_alphanumeric(data):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(data, key=alphanum_key, reverse=False)
 
+# linear func for transformation of channels to eneries
 def lin(x, a, b):
     return a * x + b
 
@@ -39,12 +41,25 @@ def callbackF(x):
 
 #%% data path and files
 
-data_path_lu = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Lu/10000Bq_20200916_300s.csv'
-data_path_iod = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Iod/1000Bq_20201007_300s.csv'
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_4.csv'
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
-data_path_mix = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/HalfLife/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+data_path_lu = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/10000Bq_20200916_300s.csv'
+data_path_iod = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201007_300s.csv'
+
+# pure Iod
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201007_300s.csv'
+
+# pure Lu
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/50Bq_20200923_300s.csv'
+
+# Mixture: 500Bq iod and 200Bq Lu (300s)
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
+
+# Mixture: 3600s
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
+data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+
+# define measuring time
+dt = 3600.
 
 #%% read data
 
@@ -59,7 +74,7 @@ with open(data_path_lu, "r") as f:
             counts_lu.append(float(line[1]))
 new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
 # Savitzky-Golay filter for smoothing
-new_counts_lu_smooth = savgol_filter(new_counts_lu, 21, 3) # window size, polynomial order
+new_counts_lu_smooth = savgol_filter(new_counts_lu, 11, 3) # window size, polynomial order
 
 channels_iod = []
 counts_iod = []
@@ -71,8 +86,7 @@ with open(data_path_iod, "r") as f:
             channels_iod.append(float(line[0]))
             counts_iod.append(float(line[1]))
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
-new_counts_iod_smooth = savgol_filter(new_counts_iod, 21, 3)
-
+new_counts_iod_smooth = savgol_filter(new_counts_iod, 11, 3)
 
 channels_mix = []
 counts_mix = []
@@ -85,8 +99,9 @@ with open(data_path_mix, "r") as f:
             channels_mix.append(float(line[0]))
             counts_mix.append(float(line[1]))
             bg_mix.append(float(line[2]))
+#bg_mix = np.linspace(0, 0, len(counts_mix))
 new_counts_mix = np.asarray(np.subtract(counts_mix, bg_mix))
-new_counts_mix_smooth = savgol_filter(new_counts_mix, 31, 3)
+new_counts_mix_smooth = savgol_filter(new_counts_mix, 11, 3)
 
 #%% Converting channels to energies
 
@@ -135,39 +150,53 @@ Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
 Iod_peak = 791 #np.argmax(new_counts_iod)
 Iod_min, Iod_max = Iod_peak - 118, Iod_peak + 118
 
-# choose the right calibration factor (depends on counts in window E)
-if sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 100:
+# choose the right calibration factor 
+# Iod: depends on cps in window E
+cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
+
+if cps_iod_winE < 100:
     iod_factor = 18.7
-elif 100 <= sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 500:
+elif 100 <= cps_iod_winE < 500:
     iod_factor = 18.2
-elif 500 <= sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 5000:
+elif 500 <= cps_iod_winE < 5000:
     iod_factor = 17.7
-elif 5000 <= sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 10000:
+elif 5000 <= cps_iod_winE < 10000:
     iod_factor = 17.
-elif sum(new_counts_mix_smooth[Iod_min:Iod_max]) >= 10000:
+elif cps_iod_winE >= 10000:
     iod_factor = 16.5
+
+# Lu
+lu_factor = 12.68
 
 #%% Print results
 
+# print energy windows
 print('\n--- Energy Windows ---')
 print('Lu: Peak {}, Min {}, Max {}'.format(Lu_peak, Lu_min, Lu_max))
 print('Iod: Peak {}, Min {}, Max {}'.format(Iod_peak, Iod_min, Iod_max))
 print('---------------------')
 
-# results of normalization
+# results of normalization; area should be 1
 print('\n--- Normalization ---')
 print('Area Lu sopectrum (norm.):', round(simps(new_counts_lu_smooth, channels_lu),3))
 print('Area Iod spectrum (norm.):', round(simps(new_counts_iod_smooth, channels_iod),3))
 print('---------------------')
 
+# print results of optimizer (c_lu. c_iod) 
 print('\n--- Optimized Factors ---')
 print('c_Lu:', res.x[0])
 print('c_Iod:', res.x[1])
 print('-------------------------')
 
+# print the calibration factors (depends on energy windows)
+print('\n--- Calibration Factors ---')
+print('Lu:', lu_factor)
+print('Iod:', iod_factor)
+print('-------------------------')
+
 # Calculation of specific activities
-Lu_act = (simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / 3600) * 12.68
-Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / 3600) * iod_factor
+Lu_act = (simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
+Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
 print('\n--- Calculated Activities ---')
 print('Lu activity [Bq]:', round(Lu_act , 2))
 print('Iod activity [Bq]:', round(Iod_act, 2))
@@ -184,6 +213,7 @@ print('------------------------------------')
 
 #%% plots
 
+# define plots
 fig = plt.figure(figsize=(16,15))
 ax1 = fig.add_subplot(5,1,1)
 ax2 = fig.add_subplot(5,1,2)
@@ -204,7 +234,7 @@ ax2.set_ylabel('x_i/sum(x_i)')
 ax2.legend()
 
 # Mixture (measured)
-ax3.plot(np.asarray(energy_channels_mix), counts_mix, label='Mixture (measured)')
+ax3.plot(np.asarray(energy_channels_mix), new_counts_mix, label='Mixture (measured)')
 ax3.plot(np.asarray(energy_channels_mix), new_counts_mix_smooth, label='Mixture (smooth)')
 ax3.set_ylabel('counts')
 ax3.legend()
