@@ -130,11 +130,24 @@ print('---------------------------')
 # Lu boundaries, A window (width: 72)
 Lu_peak = 126 #np.argmax(new_counts_lu)
 Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
+
 # Iod boundaries, E window (width: 236)
 Iod_peak = 791 #np.argmax(new_counts_iod)
 Iod_min, Iod_max = Iod_peak - 118, Iod_peak + 118
 
-print(sum(new_counts_mix_smooth[Iod_min:Iod_max]))
+# choose the right calibration factor (depends on counts in window E)
+if sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 100:
+    iod_factor = 18.7
+elif 100 <= sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 500:
+    iod_factor = 18.2
+elif 500 <= sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 5000:
+    iod_factor = 17.7
+elif 5000 <= sum(new_counts_mix_smooth[Iod_min:Iod_max]) < 10000:
+    iod_factor = 17.
+elif sum(new_counts_mix_smooth[Iod_min:Iod_max]) >= 10000:
+    iod_factor = 16.5
+
+#%% Print results
 
 print('\n--- Energy Windows ---')
 print('Lu: Peak {}, Min {}, Max {}'.format(Lu_peak, Lu_min, Lu_max))
@@ -154,7 +167,7 @@ print('-------------------------')
 
 # Calculation of specific activities
 Lu_act = (simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / 3600) * 12.68
-Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / 3600) * 16.5
+Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / 3600) * iod_factor
 print('\n--- Calculated Activities ---')
 print('Lu activity [Bq]:', round(Lu_act , 2))
 print('Iod activity [Bq]:', round(Iod_act, 2))
