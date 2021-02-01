@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from scipy.optimize import minimize
 from scipy.integrate import simps
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter # Savitzky-Golay filter for smoothing
 
 #%% functions
 
@@ -29,9 +29,9 @@ def lin(x, a, b):
 
 # objective function: Least square
 # x is the array containing the wanted coefficients: c_lu, c_iod
-def obj_func(x, counts_mix, new_counts_lu, new_counts_iod):
-    y_pred = (x[0] * new_counts_lu) + (x[1] * new_counts_iod)
-    return np.sum((counts_mix - y_pred)**2)
+def obj_func(x, new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth):
+    y_pred = (x[0] * new_counts_lu_smooth) + (x[1] * new_counts_iod_smooth)
+    return np.sum((new_counts_mix_smooth - y_pred)**2)
 
 # callback function for more scipy.optimize.minimize infos
 def callbackF(x):
@@ -45,62 +45,105 @@ data_path_lu = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/1000
 data_path_iod = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201007_300s.csv'
 
 # pure Iod
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201007_300s.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201106_300s.csv'
 
 # pure Lu
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/50Bq_20200923_300s.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/100Bq_20200923_300s.csv'
 
 # Mixture: 500Bq iod and 200Bq Lu (300s)
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
+data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
 
 # Mixture: 3600s
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
-data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
-dt = 3600.
+dt = 300.
 
 #%% read data
 
+# Lu: pure (reference)spectrum
 channels_lu = []
 counts_lu = []
 with open(data_path_lu, "r") as f:
     reader = csv.reader(f, delimiter=";")
-    start = 14
+    
+    # choose the right start parameter (first channel)
+    for line in reader:
+        if line == []:
+            continue
+        if line[0] == 'Kanal':
+            break
+
     for i, line in enumerate(reader):
-        if i > start:
-            channels_lu.append(float(line[0]))
+        channels_lu.append(int(line[0]))
+        # avoid negative counts
+        if float(line[1]) < 0.0:
+            counts_lu.append(0)
+        else:
             counts_lu.append(float(line[1]))
+
+# normalization
 new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
-# Savitzky-Golay filter for smoothing
+#savgol filter
 new_counts_lu_smooth = savgol_filter(new_counts_lu, 11, 3) # window size, polynomial order
 
+# Iod: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
 with open(data_path_iod, "r") as f:
     reader = csv.reader(f, delimiter=";")
-    start = 14
+
+    # choose the right start parameter (first channel)
+    for line in reader:
+        if line == []:
+            continue
+        if line[0] == 'Kanal':
+            break
+
     for i, line in enumerate(reader):
-        if i > start:
-            channels_iod.append(float(line[0]))
+        channels_iod.append(int(line[0]))
+        # avoid negative counts
+        if float(line[1]) < 0.0:
+            counts_iod.append(0)
+        else:
             counts_iod.append(float(line[1]))
+
+# normalization
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
+#savgol filter
 new_counts_iod_smooth = savgol_filter(new_counts_iod, 11, 3)
 
+# Mix spectrum
 channels_mix = []
 counts_mix = []
 bg_mix = []
 with open(data_path_mix, "r") as f:
     reader = csv.reader(f, delimiter=";")
-    start = 14
+
+    # choose the right start parameter (first channel)
+    for line in reader:
+        if line == []:
+            continue
+        if line[0] == 'Kanal':
+            break
+
+    # read dataset and fill lists
     for i, line in enumerate(reader):
-        if i > start:
-            channels_mix.append(float(line[0]))
-            counts_mix.append(float(line[1]))
+        channels_mix.append(int(line[0]))
+        counts_mix.append(float(line[1]))
+
+        # depends on separate background column
+        if len(line) == 2:
+            bg_mix = np.linspace(0, 0, len(counts_mix))
+        if len(line) == 3:
             bg_mix.append(float(line[2]))
-#bg_mix = np.linspace(0, 0, len(counts_mix))
+
 new_counts_mix = np.asarray(np.subtract(counts_mix, bg_mix))
+# avoid negative counts
+new_counts_mix[new_counts_mix < 0] = 0
+#savgol filter
 new_counts_mix_smooth = savgol_filter(new_counts_mix, 11, 3)
 
 #%% Converting channels to energies
