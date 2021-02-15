@@ -26,6 +26,24 @@ def sorted_alphanumeric(data):
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(data, key=alphanum_key, reverse=False)
 
+# optimize smoothing filter
+def optimized_smoothing(counts_arr):
+    winsize = 5 # must be larger than polynomial order
+    for num in range(1000):
+        counts_smooth_arr = savgol_filter(counts_arr, winsize, 3) # window size, polynomial order
+
+        y_mean = sum(counts_arr)/float(len(counts_arr))
+        ss_tot = sum((yi-y_mean)**2 for yi in counts_arr)
+        ss_err = sum((yi-fi)**2 for yi,fi in zip(counts_arr, counts_smooth_arr))
+        r2 = 1 - (ss_err/ss_tot)
+    
+        if r2 > 0.991:
+            break
+        else:
+            winsize += 2
+        
+    return winsize, counts_smooth_arr, r2
+
 # linear func for transformation of channels to eneries
 def lin(x, a, b):
     return a * x + b
@@ -91,8 +109,14 @@ with open(data_path_lu, "r") as f:
 
 # normalization
 new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
+
 #savgol filter
-new_counts_lu_smooth = savgol_filter(new_counts_lu, 11, 3) # window size, polynomial order
+winsize_lu, new_counts_lu_smooth, r2_lu  = optimized_smoothing(new_counts_lu)
+
+print('\n--- R^2 Lu177m ---')
+print('Window size:', winsize_lu)
+print('R^2:', round(r2_lu, 3))
+print('---------------------')
 
 # Iod: pure (reference)spectrum
 channels_iod = []
@@ -117,9 +141,20 @@ with open(data_path_iod, "r") as f:
 
 # normalization
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
+# avoid negative counts
+new_counts_iod[new_counts_iod < 0] = 0
+
 #savgol filter
 new_counts_iod_smooth = savgol_filter(new_counts_iod, 11, 3)
+'''
+#savgol filter
+winsize_iod, new_counts_iod_smooth, r2_iod  = optimized_smoothing(new_counts_iod)
 
+print('\n--- R^2 Iod ---')
+print('Window size:', winsize_iod)
+print('R^2:', round(r2_iod, 3))
+print('---------------------')
+'''
 # Mix spectrum
 channels_mix = []
 counts_mix = []
@@ -146,10 +181,17 @@ with open(data_path_mix, "r") as f:
             bg_mix.append(float(line[2]))
 
 new_counts_mix = np.asarray(np.subtract(counts_mix, bg_mix))
+
 # avoid negative counts
 new_counts_mix[new_counts_mix < 0] = 0
+
 #savgol filter
-new_counts_mix_smooth = savgol_filter(new_counts_mix, 11, 3)
+winsize_mix, new_counts_mix_smooth, r2_mix  = optimized_smoothing(new_counts_mix)
+
+print('\n--- R^2 Mixture ---')
+print('Window size:', winsize_mix)
+print('R^2:', round(r2_mix, 3))
+print('---------------------')
 
 #%% Converting channels to energies
 
@@ -170,8 +212,8 @@ for channel in channels_mix:
     energy_channels_mix.append(energy)
 
 #%% Optimization
-
 # scipy: minimize
+
 Nfeval = 1
 
 print('\n--- Start Optimization ---')
@@ -191,7 +233,7 @@ print('---------------------------')
 
 #%% Calculations
 
-# Define specific windows
+### Define specific windows
 # Lu boundaries, A window (width: 72)
 Lu_peak = 126 #np.argmax(new_counts_lu)
 Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
@@ -200,7 +242,18 @@ Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
 Iod_peak = 791 #np.argmax(new_counts_iod)
 Iod_min, Iod_max = Iod_peak - 118, Iod_peak + 118
 
-# choose the right calibration factor 
+
+### Choose the right calibration factor 
+# Lu: depends on cps in window A
+cps_lu_winA = (sum(counts_lu[Lu_min:Lu_max])/300.)
+
+if cps_lu_winA < 50:
+    lu_factor = 12.68
+elif 50 <= cps_lu_winA < 500:
+    lu_factor = 11.5
+elif 500 <= cps_lu_winA:
+    lu_factor = 10.88
+
 # Iod: depends on cps in window E
 cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
 
@@ -215,8 +268,17 @@ elif 5000 <= cps_iod_winE < 10000:
 elif cps_iod_winE >= 10000:
     iod_factor = 16.5
 
-# Lu
-lu_factor = 12.68
+
+### Calculation of specific activities
+Lu_act = (simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
+Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
+
+
+### Calculation of the coefficient of determination (R^2)
+y_mean = sum(new_counts_mix_smooth)/float(len(new_counts_mix_smooth))
+ss_tot = sum((yi-y_mean)**2 for yi in new_counts_mix_smooth)
+ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(res.x[0]*new_counts_lu_smooth+res.x[1]*new_counts_iod_smooth)))
+r2 = 1 - (ss_err/ss_tot)
 
 #%% Print results
 
@@ -244,19 +306,13 @@ print('Lu:', lu_factor)
 print('Iod:', iod_factor)
 print('-------------------------')
 
-# Calculation of specific activities
-Lu_act = (simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
-Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
+# print specific activities
 print('\n--- Calculated Activities ---')
 print('Lu activity [Bq]:', round(Lu_act , 2))
 print('Iod activity [Bq]:', round(Iod_act, 2))
 print('-----------------------------')
 
-# Calculation of the coefficient of determination (R^2)
-y_mean = sum(new_counts_mix_smooth)/float(len(new_counts_mix_smooth))
-ss_tot = sum((yi-y_mean)**2 for yi in new_counts_mix_smooth)
-ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(res.x[0]*new_counts_lu_smooth+res.x[1]*new_counts_iod_smooth)))
-r2 = 1 - (ss_err/ss_tot)
+# print the coefficient of determination (R^2)
 print('\n--- Coefficient Of Determination ---')
 print('R^2:', round(r2, 3))
 print('------------------------------------')
