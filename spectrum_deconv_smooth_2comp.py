@@ -3,9 +3,12 @@
 """
 Author: Eric Einspänner
 
+Spectrum deconvolution for 2 components: Lu177m, I131
+
 This program is free software.
 """
 import re
+import os
 import csv
 
 import numpy as np
@@ -41,8 +44,10 @@ def callbackF(x):
 
 #%% data path and files
 
-data_path_lu = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/10000Bq_20200916_300s.csv'
-data_path_iod = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201007_300s.csv'
+py_path = os.getcwd()
+
+data_path_lu = py_path + '/Data/Lu/10000Bq_20200916_300s.csv'
+data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
 
 # pure Iod
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201106_300s.csv'
