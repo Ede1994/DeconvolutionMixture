@@ -14,7 +14,7 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 from scipy.integrate import simps
 from scipy.signal import savgol_filter # Savitzky-Golay filter for smoothing
 
@@ -56,15 +56,15 @@ data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/100Bq_20200923_300s.csv'
 
 # Mixture: 500Bq iod and 200Bq Lu (300s)
-data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
 
 # Mixture: 3600s
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
+data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
-dt = 300.
+dt = 3600.
 
 #%% read data
 
@@ -177,14 +177,16 @@ Nfeval = 1
 print('\n--- Start Optimization ---')
 print('{0:4s}       {1:9s}      {2:9s}       {3:9s}'.format('Iter', ' c_Lu', ' c_Iod', 'obj. Func.'))
 
-# without smoothing
+# initial values
 xinit = np.array([0, 0])
-#res = minimize(fun=obj_func, args=(counts_mix, new_counts_lu, new_counts_iod), x0=xinit, method='Nelder-Mead',\
-#               tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
 
-# with smoothing  
-res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='Nelder-Mead',\
-               tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
+# bounds
+bnds = Bounds([0.0, 0.0], [10000000., 10000000.])
+
+# optimize minimize 
+res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
+               bounds=bnds, tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
+
 print('---------------------------')
 
 #%% Calculations

@@ -14,7 +14,7 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 from scipy.integrate import simps
 from scipy.signal import savgol_filter # Savitzky-Golay filter for smoothing
 
@@ -210,14 +210,16 @@ Nfeval = 1
 print('\n--- Start Optimization ---')
 print('{0:4s}       {1:9s}      {2:9s}       {3:9s}       {4:9s}'.format('Iter', ' c_Lu177m', ' c_Lu177', ' c_Iod', 'obj. Func.'))
 
-# without smoothing
+# initial values
 xinit = np.array([0, 0, 0])
-#res = minimize(fun=obj_func, args=(counts_mix, new_counts_lu, new_counts_iod), x0=xinit, method='Nelder-Mead',\
-#               tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
 
-# with smoothing  
-res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth), x0=xinit, method='Nelder-Mead',\
-               tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
+# bounds
+bnds = Bounds([0.0, 0.0, 0.0], [10000000., 10000000., 10000000.])
+
+# optimize minimize 
+res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
+               bounds=bnds, tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True}) #bounds=None
+
 print('---------------------------')
 
 #%% Calculations
