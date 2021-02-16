@@ -57,7 +57,7 @@ def obj_func(x, new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smoo
 # callback function for more scipy.optimize.minimize infos
 def callbackF(x):
     global Nfeval
-    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func(x, counts_mix, new_counts_lu, new_counts_iod)))
+    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func(x, new_counts_mix_smooth, new_counts_lu, new_counts_iod)))
     Nfeval += 1
 
 #%% data path and files
