@@ -12,7 +12,6 @@ import os
 import csv
 
 import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -23,7 +22,12 @@ from scipy.signal import savgol_filter
 import tkinter as tk
 from tkinter import filedialog
 
-# definition of figures
+#%% Definitions
+
+### iteration counter
+Nfeval = 1
+
+### definition of figures
 fig = Figure(figsize=(16, 15), dpi=60)
 ax1 = fig.add_subplot(5,1,1)
 ax2 = fig.add_subplot(5,1,2)
@@ -31,7 +35,15 @@ ax3 = fig.add_subplot(5,1,3)
 ax4 = fig.add_subplot(5,1,4)
 ax5 = fig.add_subplot(5,1,5)
 
-Nfeval = 1
+### Define specific windows
+# Lu boundaries, A window (width: 72)
+Lu_peak = 126 #np.argmax(new_counts_lu)
+Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
+
+# Iod boundaries, E window (width: 236)
+Iod_peak = 791 #np.argmax(new_counts_iod)
+Iod_min, Iod_max = Iod_peak - 118, Iod_peak + 118
+
 
 #%% Functions
 
@@ -76,7 +88,7 @@ def callbackF(x):
     Nfeval += 1
 
 
-#%% data path and files
+#%% Read reference (pure) spectrums
 
 # reference (pure) spectrum for iod and lu
 py_path = os.getcwd()
@@ -84,7 +96,7 @@ py_path = os.getcwd()
 data_path_lu = py_path + '/Data/Lu/10000Bq_20200916_300s.csv'
 data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
 
-# Lu: pure (reference)spectrum
+### Lu: pure (reference)spectrum
 channels_lu = []
 counts_lu = []
 with open(data_path_lu, "r") as f:
@@ -111,7 +123,7 @@ new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
 #savgol filter
 winsize_lu, new_counts_lu_smooth, r2_lu  = optimized_smoothing(new_counts_lu)
 
-# Iod: pure (reference)spectrum
+### Iod: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
 with open(data_path_iod, "r") as f:
@@ -134,8 +146,6 @@ with open(data_path_iod, "r") as f:
 
 # normalization
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
-# avoid negative counts
-new_counts_iod[new_counts_iod < 0] = 0
 
 #savgol filter
 new_counts_iod_smooth = savgol_filter(new_counts_iod, 11, 3)
@@ -205,8 +215,47 @@ def spectrum_deconv():
     c_Lu = res.x[0]
     c_Iod = res.x[1]
 
+    ### Choose the right calibration factor 
+    # Lu: depends on cps in window A
+    cps_lu_winA = (sum(counts_lu[Lu_min:Lu_max])/300.)
 
-    # converting channels to energies
+    if cps_lu_winA < 50:
+        lu_factor = 12.68
+    elif 50 <= cps_lu_winA < 500:
+        lu_factor = 11.5
+    elif 500 <= cps_lu_winA:
+        lu_factor = 10.88
+
+    # Iod: depends on cps in window E
+    cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
+
+    if cps_iod_winE < 100:
+        iod_factor = 18.7
+    elif 100 <= cps_iod_winE < 500:
+        iod_factor = 18.2
+    elif 500 <= cps_iod_winE < 5000:
+        iod_factor = 17.7
+    elif 5000 <= cps_iod_winE < 10000:
+        iod_factor = 17.
+    elif cps_iod_winE >= 10000:
+        iod_factor = 16.5
+
+    ### Calculation of specific activities
+    Lu_act = round((simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / dt) * lu_factor, 2)
+    Iod_act = round((simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor, 2)
+
+    ### Calculation of the coefficient of determination (R^2)
+    y_mean = sum(new_counts_mix_smooth)/float(len(new_counts_mix_smooth))
+    ss_tot = sum((yi-y_mean)**2 for yi in new_counts_mix_smooth)
+    ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(res.x[0]*new_counts_lu_smooth+res.x[1]*new_counts_iod_smooth)))
+    r2 = round(1 - (ss_err/ss_tot), 3)
+
+    ### results; add in label areas
+    label_areaCalcActivityLu177m.config(text=str(Lu_act))
+    label_areaCalcActivityI131.config(text=str(Iod_act))
+    label_areaR2.config(text=str(r2))
+
+    ### converting channels to energies, for plots
     energy_channels_lu = []
     for channel in channels_lu:
         energy = lin(channel, 0.46079, 0)
@@ -221,7 +270,8 @@ def spectrum_deconv():
     for channel in channels_iod:
         energy = lin(channel, 0.46079, 0)
         energy_channels_mix.append(energy)
-    
+
+    ### Define plots    
     ax1.clear()
     ax2.clear()
     ax3.clear()
@@ -263,7 +313,8 @@ def spectrum_deconv():
     
     canvas = FigureCanvasTkAgg(fig, master=root)
     canvas.draw()
-    canvas.get_tk_widget().grid(row=0, column=6, rowspan=5, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
+    canvas.get_tk_widget().grid(row=0, column=4, rowspan=6, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
+
 
 #%% Buttons
 
@@ -324,6 +375,7 @@ def buttonImport():
 def button_SpectrumDeconvolution():
     spectrum_deconv()
 
+
 #%% GUI
 
 root = tk.Tk()
@@ -361,23 +413,36 @@ buttonImport = tk.Button(text='Import Data', width='10', bg='green', command=but
 buttonImport.grid(row=0, column=0, padx='5', pady='5')
 
 # spectrum path
-label_spectrum = tk.Label(root, text="Spectrum:").grid(row=1)
+label_spectrum = tk.Label(root, text="Path Spectrum:").grid(row=1)
 entry_spectrum = tk.Entry(root)
-entry_spectrum.grid(row=1, column=1, columnspan=3, padx=15)
+entry_spectrum.grid(row=1, column=1, ipadx=100, padx=15)
 
 # measuring time
 label_dt = tk.Label(root, text="Measuring Time [s]:").grid(row=2)
 entry_dt = tk.Entry(root)
-entry_dt.grid(row=2, column=1, columnspan=3, padx=15)
+entry_dt.grid(row=2, column=1, padx=15, sticky=tk.W)
 entry_dt.insert(10, int(3600))
 
 # Calculation button
-buttonImport = tk.Button(text='Spectrum Deconvolution', width='20', bg='blue', command=button_SpectrumDeconvolution)
-buttonImport.grid(row=3, column=4, padx='5', pady='5')
+buttonImport = tk.Button(text='Spectrum Deconvolution', width='20', bg='yellow', command=button_SpectrumDeconvolution)
+buttonImport.grid(row=3, column=0, padx='5', pady='5')
+
+# results
+label_CalcActivityLu177m = tk.Label(root, text="Calculated Activity Lu177m (Bq):").grid(row=4, column=0)
+label_areaCalcActivityLu177m = tk.Label(root, bg='gray', width='12', text="")
+label_areaCalcActivityLu177m.grid(row=4, column=1)
+
+label_CalcActivityI131 = tk.Label(root, text="Calculated Activity I131 (Bq):").grid(row=5, column=0)
+label_areaCalcActivityI131 = tk.Label(root, bg='gray', width='12', text="")
+label_areaCalcActivityI131.grid(row=5, column=1)
+
+label_R2 = tk.Label(root, text="R^2:").grid(row=6, column=0)
+label_areaR2 = tk.Label(root, bg='gray', width='12', text="")
+label_areaR2.grid(row=6, column=1)
 
 # plot areas
-plot_frame = tk.Frame(width=500, height=400, bg="grey", colormap="new")
-plot_frame.grid(row=0, column=6, rowspan=5, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
+plot_frame = tk.Frame(width=600, height=500, bg="grey", colormap="new")
+plot_frame.grid(row=0, column=4, rowspan=6, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
 
 # run GUI
 root.mainloop()
