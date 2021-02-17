@@ -1,0 +1,7 @@
+Here you can find some instructions.
+
+GUI:
+- the reference (pure) spectra are fixed -> you can change this in the source code, if necessary
+- Use the "Import Data"-Button to import AND load specific data files (you can also write the PATH in the entry box by hand)
+- Change the measuring time (defalut = 3600s)
+- Press the "Spectrum Deconvolution"-Button to start the calculations (for more infos see the Background-Folder and/or GitHub)

@@ -10,9 +10,8 @@
 
 
 # Introduction
-SpectrDeconv is a Open Source software that calculates . It contains the possibility to import and fit measurement data of a gamma probe. The results are the fit graphically displayed as well as the effective half-life and the patient dose according to Marinelli. The results are saved as pdf.
-
-The basic calculations can be found in [CalculationBases](/CalculationBases).
+SpectrDeconv is a Open Source software that uses the shape of a measured spectrum to calculate its components by fitting the pure
+(reference) spectrum of each component to the measured composite spectrum (mixture). It contains the possibility to import and fit measurement data of a gamma probe in a Marinelli bulb. The results are the fit graphically displayed as well as the calculated activity concentrations of each individual component.
 
 
 # Installation
@@ -33,4 +32,4 @@ This software is distributed under an open source license, see LICENSE.txt for d
 
 
 # Links
-- [GitHub](https://github.com/Ede1994/)
+- [GitHub](https://github.com/Ede1994/DeconvolutionMixture)
