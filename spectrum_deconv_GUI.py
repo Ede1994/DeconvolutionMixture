@@ -3,7 +3,7 @@
 """
 Author: Eric Einspänner
 
-Spectrum deconvolution for 2 components: Lu177m, I131
+GUI, Spectrum deconvolution for 2 components: Lu177m, I131
 
 This program is free software.
 """
