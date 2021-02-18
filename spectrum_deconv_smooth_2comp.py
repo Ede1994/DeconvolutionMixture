@@ -77,9 +77,9 @@ data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
 
 # Mixture: 3600s
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
+data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
-data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
 dt = 3600.
@@ -121,6 +121,7 @@ print('---------------------')
 # Iod: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
+bg_iod = []
 with open(data_path_iod, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
@@ -131,18 +132,22 @@ with open(data_path_iod, "r") as f:
         if line[0] == 'Kanal':
             break
 
+    # read dataset and fill lists
     for i, line in enumerate(reader):
         channels_iod.append(int(line[0]))
-        # avoid negative counts
-        if float(line[1]) < 0.0:
-            counts_iod.append(0)
-        else:
-            counts_iod.append(float(line[1]))
+        counts_iod.append(float(line[1]))
 
+        # depends on separate background column
+        if len(line) == 2:
+            bg_iod = np.linspace(0, 0, len(counts_iod))
+        if len(line) == 3:
+            bg_iod.append(float(line[2]))
+
+counts_iod = np.asarray(np.subtract(counts_iod, bg_iod))
+# avoid negative counts
+counts_iod[counts_iod < 0] = 0
 # normalization
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
-# avoid negative counts
-new_counts_iod[new_counts_iod < 0] = 0
 
 #savgol filter
 winsize_iod, new_counts_iod_smooth, r2_iod  = optimized_smoothing(new_counts_iod)
@@ -227,6 +232,8 @@ res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, 
                bounds=bnds, tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
 
 print('---------------------------')
+
+print(res)
 
 #%% Calculations
 

@@ -124,6 +124,7 @@ new_counts_lu177_smooth = savgol_filter(new_counts_lu177, 11, 3) # window size, 
 # Iod: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
+bg_iod = []
 with open(data_path_iod, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
@@ -134,14 +135,20 @@ with open(data_path_iod, "r") as f:
         if line[0] == 'Kanal':
             break
 
+    # read dataset and fill lists
     for i, line in enumerate(reader):
         channels_iod.append(int(line[0]))
-        # avoid negative counts
-        if float(line[1]) < 0.0:
-            counts_iod.append(0)
-        else:
-            counts_iod.append(float(line[1]))
+        counts_iod.append(float(line[1]))
 
+        # depends on separate background column
+        if len(line) == 2:
+            bg_iod = np.linspace(0, 0, len(counts_iod))
+        if len(line) == 3:
+            bg_iod.append(float(line[2]))
+
+counts_iod = np.asarray(np.subtract(counts_iod, bg_iod))
+# avoid negative counts
+counts_iod[counts_iod < 0] = 0
 # normalization
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
 #savgol filter

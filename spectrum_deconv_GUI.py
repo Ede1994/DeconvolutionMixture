@@ -123,9 +123,10 @@ new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
 #savgol filter
 winsize_lu, new_counts_lu_smooth, r2_lu  = optimized_smoothing(new_counts_lu)
 
-### Iod: pure (reference)spectrum
+# Iod: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
+bg_iod = []
 with open(data_path_iod, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
@@ -136,19 +137,24 @@ with open(data_path_iod, "r") as f:
         if line[0] == 'Kanal':
             break
 
+    # read dataset and fill lists
     for i, line in enumerate(reader):
         channels_iod.append(int(line[0]))
-        # avoid negative counts
-        if float(line[1]) < 0.0:
-            counts_iod.append(0)
-        else:
-            counts_iod.append(float(line[1]))
+        counts_iod.append(float(line[1]))
 
+        # depends on separate background column
+        if len(line) == 2:
+            bg_iod = np.linspace(0, 0, len(counts_iod))
+        if len(line) == 3:
+            bg_iod.append(float(line[2]))
+
+counts_iod = np.asarray(np.subtract(counts_iod, bg_iod))
+# avoid negative counts
+counts_iod[counts_iod < 0] = 0
 # normalization
 new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
-
 #savgol filter
-new_counts_iod_smooth = savgol_filter(new_counts_iod, 11, 3)
+winsize_iod, new_counts_iod_smooth, r2_iod  = optimized_smoothing(new_counts_iod)
 
 
 #%% Functions for GUI
@@ -313,7 +319,21 @@ def spectrum_deconv():
     
     canvas = FigureCanvasTkAgg(fig, master=root)
     canvas.draw()
-    canvas.get_tk_widget().grid(row=0, column=4, rowspan=6, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
+    canvas.get_tk_widget().grid(row=0, column=4, rowspan=20, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
+    
+    ###
+    frame = tk.Frame(root)
+    frame.grid(row=0, column=10, rowspan=10, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, ipadx=20, padx=1, pady=1)
+    scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL)
+    listbox = tk.Listbox(frame, yscrollcommand=scrollbar.set)
+    listbox.insert("end", 'Optimizer: L-BFGS-B')
+    listbox.insert("end", '\nNo. of Iter: ' + str(res.nit))
+    listbox.insert("end", '\nSuccess: ' + str(res.success))
+    listbox.insert("end", '\nc_Lu: ' + str(res.x[0]))
+    listbox.insert("end", '\nc_Iod: ' + str(res.x[1]))
+    scrollbar.config(command=listbox.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 
 
 #%% Buttons
@@ -442,7 +462,7 @@ label_areaR2.grid(row=6, column=1)
 
 # plot areas
 plot_frame = tk.Frame(width=600, height=500, bg="grey", colormap="new")
-plot_frame.grid(row=0, column=4, rowspan=6, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
+plot_frame.grid(row=0, column=4, rowspan=20, columnspan=5, sticky=tk.W + tk.E + tk.N + tk.S, padx=1, pady=1)
 
 # run GUI
 root.mainloop()
