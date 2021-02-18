@@ -64,8 +64,8 @@ def callbackF(x):
 
 py_path = os.getcwd()
 
-data_path_lu = py_path + '/Data/Lu/10000Bq_20200916_300s.csv'
-data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
+data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
+data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 # pure Iod
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201106_300s.csv'
@@ -77,9 +77,9 @@ data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
 
 # Mixture: 3600s
-data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
+#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
 dt = 3600.
@@ -145,16 +145,13 @@ new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
 new_counts_iod[new_counts_iod < 0] = 0
 
 #savgol filter
-new_counts_iod_smooth = savgol_filter(new_counts_iod, 11, 3)
-'''
-#savgol filter
 winsize_iod, new_counts_iod_smooth, r2_iod  = optimized_smoothing(new_counts_iod)
 
 print('\n--- R^2 Iod ---')
 print('Window size:', winsize_iod)
 print('R^2:', round(r2_iod, 3))
 print('---------------------')
-'''
+
 # Mix spectrum
 channels_mix = []
 counts_mix = []

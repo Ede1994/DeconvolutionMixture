@@ -93,8 +93,8 @@ def callbackF(x):
 # reference (pure) spectrum for iod and lu
 py_path = os.getcwd()
 
-data_path_lu = py_path + '/Data/Lu/10000Bq_20200916_300s.csv'
-data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
+data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
+data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 ### Lu: pure (reference)spectrum
 channels_lu = []

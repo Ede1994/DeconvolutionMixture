@@ -46,9 +46,9 @@ def callbackF(x):
 
 py_path = os.getcwd()
 
-data_path_lu177m = py_path + '/Data/Lu/10000Bq_20200916_300s.csv'
-data_path_lu177 = py_path + '/Data/Lu2/AWM_Lu177_7000Bq_3600s_040221.csv'
-data_path_iod = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
+data_path_lu177m = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
+data_path_lu177 = py_path + '/Data/Reference/AWM_Lu177_7000Bq_3600s_040221.csv'
+data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 # pure Iod
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201106_300s.csv'
@@ -237,7 +237,20 @@ Lu177_min, Lu177_max = Lu177_peak - 36, Lu177_peak + 36
 Iod_peak = 791 #np.argmax(new_counts_iod)
 Iod_min, Iod_max = Iod_peak - 118, Iod_peak + 118
 
-# choose the right calibration factor 
+### Choose the right calibration factor 
+# Lu177m: depends on cps in window A
+cps_lu177m_winA = (sum(counts_lu177m[Lu177m_min:Lu177m_max])/300.)
+
+if cps_lu177m_winA < 50:
+    lu177m_factor = 12.68
+elif 50 <= cps_lu177m_winA < 500:
+    lu177m_factor = 11.5
+elif 500 <= cps_lu177m_winA:
+    lu177m_factor = 10.88
+
+# Lu177
+lu177_factor = 12.68
+
 # Iod: depends on cps in window E
 cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
 
@@ -251,12 +264,6 @@ elif 5000 <= cps_iod_winE < 10000:
     iod_factor = 17.
 elif cps_iod_winE >= 10000:
     iod_factor = 16.5
-
-# Lu177m
-lu177m_factor = 12.68
-
-# Lu177
-lu177_factor = 12.68
 
 #%% Print results
 
