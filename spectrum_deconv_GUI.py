@@ -391,7 +391,7 @@ def buttonImport():
     load_data(filename)
     
 
-# load file from explorer
+# call calculation function
 def button_SpectrumDeconvolution():
     spectrum_deconv()
 
@@ -444,8 +444,8 @@ entry_dt.grid(row=2, column=1, padx=15, sticky=tk.W)
 entry_dt.insert(10, int(3600))
 
 # Calculation button
-buttonImport = tk.Button(text='Spectrum Deconvolution', width='20', bg='yellow', command=button_SpectrumDeconvolution)
-buttonImport.grid(row=3, column=0, padx='5', pady='5')
+buttonCalc = tk.Button(text='Spectrum Deconvolution', width='20', bg='yellow', command=button_SpectrumDeconvolution)
+buttonCalc.grid(row=3, column=0, padx='5', pady='5')
 
 # results
 label_CalcActivityLu177m = tk.Label(root, text="Calculated Activity Lu177m (Bq):").grid(row=4, column=0)
