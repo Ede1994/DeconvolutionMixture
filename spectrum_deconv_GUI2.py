@@ -20,7 +20,6 @@ from tkinter import filedialog
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-import matplotlib.animation as animation
 
 ### Fonts
 LARGE_FONT= ("Verdana", 12)
@@ -257,17 +256,16 @@ def spectrum_deconv_2nuclids():
 
 
 ### 3 NUCLIDS
+# c_Lu177m, c_lu177, c_Iod
 def obj_func_3nuclids(x, new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth):
     y_pred = (x[0] * new_counts_Lu177m_smooth) + (x[1] * new_counts_lu177_smooth) + (x[2] * new_counts_iod_smooth)
     return np.sum((new_counts_mix_smooth - y_pred)**2)
 
-# callback function for more scipy.optimize.minimize infos
 def callbackF_3nuclids(x):
     global Nfeval
     print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}   {4: 3.6f}'.format(Nfeval, x[0], x[1], x[2], obj_func_3nuclids(x, new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth)))
     Nfeval += 1
 
-# spectrum deconvolution
 def spectrum_deconv_3nuclids():
     global c_Lu177m, c_lu177, c_Iod, Lu177m_act, lu177_act, Iod_act, r2
     dt = 3600.
@@ -497,8 +495,9 @@ new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
 #savgol filter
 winsize_iod, new_counts_iod_smooth, r2_iod  = optimized_smoothing(new_counts_iod)
 
-#%% Definitions for GUI
+#%% Functions for GUI
 
+# popupmsg as place holder
 def popupmsg(msg):
     popup = tk.Tk()
     popup.wm_title("!")
@@ -508,6 +507,7 @@ def popupmsg(msg):
     B1.pack()
     popup.mainloop()
 
+# some help instructions
 def Help():
     popup = tk.Tk()
     popup.wm_title("Help")
@@ -517,6 +517,7 @@ def Help():
     B1.pack()
     popup.mainloop()
 
+# impressum message
 def Impressum():
     popup = tk.Tk()
     popup.wm_title("Impressum")
@@ -528,6 +529,8 @@ def Impressum():
     popup.mainloop()
 
 #%% Spectrum Conv classes
+
+# define the app
 class SpectrumDeconv(tk.Tk):
 
     def __init__(self, *args, **kwargs):
@@ -536,7 +539,7 @@ class SpectrumDeconv(tk.Tk):
 
         tk.Tk.iconbitmap(self,default="tmp/nuclear.ico")
         tk.Tk.wm_title(self, "Spectrum Deconvolution")
-        tk.Tk.geometry(self, "1400x1200")
+        tk.Tk.geometry(self, "1600x1400")
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand = True)
@@ -593,9 +596,7 @@ class SpectrumDeconv(tk.Tk):
         filename = str(file.name)
 
         # insert
-        print(filename)
         tk.messagebox.showinfo(title='Import', message='Loading file successfully:\n' + filename)
-        #entry_spectrum.insert(tk.END, str(filename))
 
         # call load data function
         load_data(filename)
@@ -603,11 +604,14 @@ class SpectrumDeconv(tk.Tk):
     # Button: call calculation function
     def button_SpectrumDeconvolution_2nuclids(self):
         spectrum_deconv_2nuclids()
+        tk.messagebox.showinfo(title='Calculation', message='Calculation successful!')
 
     # Button: call calculation function
     def button_SpectrumDeconvolution_3nuclids(self):
         spectrum_deconv_3nuclids()
-        
+        tk.messagebox.showinfo(title='Calculation', message='Calculation successful!')
+
+# start page/ home screen
 class StartPage(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -628,7 +632,7 @@ class StartPage(tk.Frame):
                             command=lambda: controller.show_frame(Nuclids_3))
         button2.pack()
 
-
+# 2 nuclids
 class Nuclids_2(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -647,14 +651,14 @@ class Nuclids_2(tk.Frame):
         buttonCalc.pack()
 
         canvas = FigureCanvasTkAgg(fig, self)
-        #canvas.draw()
+        canvas.draw()
         canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
         toolbar = NavigationToolbar2Tk(canvas, self)
         toolbar.update()
         canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-
+# 3 nuclids
 class Nuclids_3(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -672,20 +676,16 @@ class Nuclids_3(tk.Frame):
         buttonCalc = ttk.Button(self, text="Start Calculation", command=controller.button_SpectrumDeconvolution_3nuclids)
         buttonCalc.pack()
 
-        canvas = FigureCanvasTkAgg(fig2, self)
-        canvas.draw()
-        canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        canvas2 = FigureCanvasTkAgg(fig2, self)
+        canvas2.draw()
+        canvas2.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
-        toolbar = NavigationToolbar2Tk(canvas, self)
-        toolbar.update()
-        canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        toolbar2 = NavigationToolbar2Tk(canvas2, self)
+        toolbar2.update()
+        canvas2._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
 
 #%% start application
 
 app = SpectrumDeconv()
-###
-ani_2nuclids = animation.FuncAnimation(fig, spectrum_deconv_2nuclids, blit=False)
-ani_3nuclids = animation.FuncAnimation(fig2, spectrum_deconv_3nuclids, blit=False)
-###
 app.mainloop()
