@@ -20,6 +20,7 @@ from tkinter import filedialog
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+import matplotlib.animation as animation
 
 ### Fonts
 LARGE_FONT= ("Verdana", 12)
@@ -37,10 +38,22 @@ ax3 = fig.add_subplot(5,1,3)
 ax4 = fig.add_subplot(5,1,4)
 ax5 = fig.add_subplot(5,1,5)
 
+fig2 = Figure(figsize=(16, 18), dpi=60)
+ax21 = fig2.add_subplot(6,1,1)
+ax22 = fig2.add_subplot(6,1,2)
+ax23 = fig2.add_subplot(6,1,3)
+ax24 = fig2.add_subplot(6,1,4)
+ax25 = fig2.add_subplot(6,1,5)
+ax26 = fig2.add_subplot(6,1,6)
+
 ### Define specific windows
 # Lu boundaries, A window (width: 72)
-Lu_peak = 126 #np.argmax(new_counts_lu)
-Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
+Lu177m_peak = 126 #np.argmax(new_counts_lu)
+Lu177m_min, Lu177m_max = Lu177m_peak - 36, Lu177m_peak + 36
+
+# Lu177 boundaries, A window (width: 72)
+Lu177_peak = 126 #np.argmax(new_counts_lu)
+Lu177_min, Lu177_max = Lu177_peak - 36, Lu177_peak + 36
 
 # Iod boundaries, E window (width: 236)
 Iod_peak = 791 #np.argmax(new_counts_iod)
@@ -77,6 +90,7 @@ def optimized_smoothing(counts_arr):
 def lin(x, a, b):
     return a * x + b
 
+# load measured dataset
 def load_data(file):
     global channels_mix, counts_mix, bg_mix, new_counts_mix, new_counts_mix_smooth
 
@@ -113,20 +127,22 @@ def load_data(file):
     #savgol filter
     winsize_mix, new_counts_mix_smooth, r2_mix  = optimized_smoothing(new_counts_mix)
 
+### 2 NUCLIDS
 # objective function: Least square
-# x is the array containing the wanted coefficients: c_lu, c_iod
-def obj_func(x, new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth):
-    y_pred = (x[0] * new_counts_lu_smooth) + (x[1] * new_counts_iod_smooth)
+# x is the array containing the wanted coefficients: c_lu177m, c_iod
+def obj_func_2nuclids(x, new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_iod_smooth):
+    y_pred = (x[0] * new_counts_Lu177m_smooth) + (x[1] * new_counts_iod_smooth)
     return np.sum((new_counts_mix_smooth - y_pred)**2)
 
 # callback function for more scipy.optimize.minimize infos
-def callbackF(x):
+def callbackF_2nuclids(x):
     global Nfeval
-    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func(x, new_counts_mix_smooth, new_counts_lu, new_counts_iod)))
+    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func_2nuclids(x, new_counts_mix_smooth, new_counts_Lu177m, new_counts_iod)))
     Nfeval += 1
 
 # spectrum deconvolution
-def spectrum_deconv():
+def spectrum_deconv_2nuclids():
+    global c_Lu177m, c_Iod, Lu177m_act, Iod_act, r2
     dt = 3600.
     # scipy: minimize
 
@@ -140,25 +156,24 @@ def spectrum_deconv():
     bnds = Bounds([0.0, 0.0], [10000000., 10000000.])
 
     # optimize minimize 
-    res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
-                   bounds=bnds, tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
+    res = minimize(fun=obj_func_2nuclids, args=(new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
+                   bounds=bnds, tol=0.001, callback=callbackF_2nuclids, options={'maxiter':2000 ,'disp': True})
 
     print('---------------------------')
-    
-    global c_Lu, c_Iod
-    c_Lu = res.x[0]
+
+    c_Lu177m = res.x[0]
     c_Iod = res.x[1]
 
     ### Choose the right calibration factor 
     # Lu: depends on cps in window A
-    cps_lu_winA = (sum(counts_lu[Lu_min:Lu_max])/300.)
+    cps_Lu177m_winA = (sum(counts_Lu177m[Lu177m_min:Lu177m_max])/300.)
 
-    if cps_lu_winA < 50:
-        lu_factor = 12.68
-    elif 50 <= cps_lu_winA < 500:
-        lu_factor = 11.5
-    elif 500 <= cps_lu_winA:
-        lu_factor = 10.88
+    if cps_Lu177m_winA < 50:
+        Lu177m_factor = 12.68
+    elif 50 <= cps_Lu177m_winA < 500:
+        Lu177m_factor = 11.5
+    elif 500 <= cps_Lu177m_winA:
+        Lu177m_factor = 10.88
 
     # Iod: depends on cps in window E
     cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
@@ -175,20 +190,20 @@ def spectrum_deconv():
         iod_factor = 16.5
 
     ### Calculation of specific activities
-    Lu_act = round((simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / dt) * lu_factor, 2)
-    Iod_act = round((simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor, 2)
+    Lu177m_act = round((simps((c_Lu177m*new_counts_Lu177m_smooth)[Lu177m_min:Lu177m_max], channels_Lu177m[Lu177m_min:Lu177m_max]) / dt) * Lu177m_factor, 2)
+    Iod_act = round((simps((c_Iod*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor, 2)
 
     ### Calculation of the coefficient of determination (R^2)
     y_mean = sum(new_counts_mix_smooth)/float(len(new_counts_mix_smooth))
     ss_tot = sum((yi-y_mean)**2 for yi in new_counts_mix_smooth)
-    ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(res.x[0]*new_counts_lu_smooth+res.x[1]*new_counts_iod_smooth)))
+    ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(c_Lu177m*new_counts_Lu177m_smooth+c_Iod*new_counts_iod_smooth)))
     r2 = round(1 - (ss_err/ss_tot), 3)
 
     ### converting channels to energies, for plots
-    energy_channels_lu = []
-    for channel in channels_lu:
+    energy_channels_Lu177m = []
+    for channel in channels_Lu177m:
         energy = lin(channel, 0.46079, 0)
-        energy_channels_lu.append(energy)
+        energy_channels_Lu177m.append(energy)
 
     energy_channels_iod = []
     for channel in channels_iod:
@@ -200,8 +215,7 @@ def spectrum_deconv():
         energy = lin(channel, 0.46079, 0)
         energy_channels_mix.append(energy)
 
-    ### Define plots
-    fig = Figure(figsize=(16, 15), dpi=60)    
+    ### Define plots  
     ax1.clear()
     ax2.clear()
     ax3.clear()
@@ -209,8 +223,8 @@ def spectrum_deconv():
     ax5.clear()
     
     # Lu Spectrum (normalized)
-    ax1.plot(np.asarray(energy_channels_lu), new_counts_lu, label='Lu Spectrum (normalized)')
-    ax1.plot(np.asarray(energy_channels_lu), new_counts_lu_smooth, label='Lu Spectrum (smooth)')
+    ax1.plot(np.asarray(energy_channels_Lu177m), new_counts_Lu177m, label='Lu Spectrum (normalized)')
+    ax1.plot(np.asarray(energy_channels_Lu177m), new_counts_Lu177m_smooth, label='Lu Spectrum (smooth)')
     ax1.set_ylabel('x_i/sum(x_i)')
     ax1.legend()
 
@@ -227,32 +241,179 @@ def spectrum_deconv():
     ax3.legend()
 
     # Lu + Iod (Calculated)
-    ax4.plot(np.asarray(energy_channels_lu), c_Lu*new_counts_lu_smooth, color='red', label='Lu (calculated+smooth)')
+    ax4.plot(np.asarray(energy_channels_Lu177m), c_Lu177m*new_counts_Lu177m_smooth, color='red', label='Lu (calculated+smooth)')
     ax4.plot(np.asarray(energy_channels_iod), c_Iod*new_counts_iod_smooth, color='green', label='Iod (calculated+smooth)')
-    ax4.plot(np.asarray(energy_channels_mix), (c_Lu*new_counts_lu_smooth+c_Iod*new_counts_iod_smooth), color='black', label='Lu + Iod (smooth)')
+    ax4.plot(np.asarray(energy_channels_mix), (c_Lu177m*new_counts_Lu177m_smooth+c_Iod*new_counts_iod_smooth), color='black', label='Lu + Iod (smooth)')
     ax4.set_ylabel('counts')
     ax4.legend()
 
     # Diff
     ax5.plot(np.asarray(energy_channels_mix), new_counts_mix_smooth, label='Mixture (smooth)')
-    ax5.plot(np.asarray(energy_channels_mix), (c_Lu*new_counts_lu_smooth+c_Iod*new_counts_iod_smooth), color='black', label='Lu + Iod (smooth)')
-    ax5.plot(np.asarray(energy_channels_mix), (new_counts_mix_smooth-(c_Lu*new_counts_lu_smooth+c_Iod*new_counts_iod_smooth)), color='red', label='Diff')
+    ax5.plot(np.asarray(energy_channels_mix), (c_Lu177m*new_counts_Lu177m_smooth+c_Iod*new_counts_iod_smooth), color='black', label='Lu + Iod (smooth)')
+    ax5.plot(np.asarray(energy_channels_mix), (new_counts_mix_smooth-(c_Lu177m*new_counts_Lu177m_smooth+c_Iod*new_counts_iod_smooth)), color='red', label='Diff')
     ax5.set_xlabel('Energy (keV)')
     ax5.set_ylabel('counts')
     ax5.legend()
+
+
+### 3 NUCLIDS
+def obj_func_3nuclids(x, new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth):
+    y_pred = (x[0] * new_counts_Lu177m_smooth) + (x[1] * new_counts_lu177_smooth) + (x[2] * new_counts_iod_smooth)
+    return np.sum((new_counts_mix_smooth - y_pred)**2)
+
+# callback function for more scipy.optimize.minimize infos
+def callbackF_3nuclids(x):
+    global Nfeval
+    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}   {4: 3.6f}'.format(Nfeval, x[0], x[1], x[2], obj_func_3nuclids(x, new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth)))
+    Nfeval += 1
+
+# spectrum deconvolution
+def spectrum_deconv_3nuclids():
+    global c_Lu177m, c_lu177, c_Iod, Lu177m_act, lu177_act, Iod_act, r2
+    dt = 3600.
+    # scipy: minimize
+
+    print('\n--- Start Optimization ---')
+    print('{0:4s}       {1:9s}      {2:9s}       {3:9s}       {4:9s}'.format('Iter', ' c_Lu177m', ' c_Lu177', ' c_Iod', 'obj. Func.'))
+
+    # initial values
+    xinit = np.array([0, 0, 0])
+
+    # bounds
+    bnds = Bounds([0.0, 0.0, 0.0], [10000000., 10000000., 10000000.])
+
+    # optimize minimize 
+    res = minimize(fun=obj_func_3nuclids, args=(new_counts_mix_smooth, new_counts_Lu177m_smooth, new_counts_lu177_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
+                   bounds=bnds, tol=0.001, callback=callbackF_3nuclids, options={'maxiter':2000 ,'disp': True})
+
+    print('---------------------------')
+
+    c_Lu177m = res.x[0]
+    c_lu177 = res.x[1]
+    c_Iod = res.x[2]
+
+    ### Choose the right calibration factor 
+    # Lu: depends on cps in window A
+    cps_Lu177m_winA = (sum(counts_Lu177m[Lu177m_min:Lu177m_max])/300.)
+
+    if cps_Lu177m_winA < 50:
+        Lu177m_factor = 12.68
+    elif 50 <= cps_Lu177m_winA < 500:
+        Lu177m_factor = 11.5
+    elif 500 <= cps_Lu177m_winA:
+        Lu177m_factor = 10.88
+        
+    # Lu177
+    lu177_factor = 12.68
+
+    # Iod: depends on cps in window E
+    cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
+
+    if cps_iod_winE < 100:
+        iod_factor = 18.7
+    elif 100 <= cps_iod_winE < 500:
+        iod_factor = 18.2
+    elif 500 <= cps_iod_winE < 5000:
+        iod_factor = 17.7
+    elif 5000 <= cps_iod_winE < 10000:
+        iod_factor = 17.
+    elif cps_iod_winE >= 10000:
+        iod_factor = 16.5
+
+    ### Calculation of specific activities
+    Lu177m_act = round((simps((c_Lu177m*new_counts_Lu177m_smooth)[Lu177m_min:Lu177m_max], channels_Lu177m[Lu177m_min:Lu177m_max]) / dt) * Lu177m_factor, 2)
+    lu177_act = round((simps((c_lu177*new_counts_lu177_smooth)[Lu177_min:Lu177_max], channels_lu177[Lu177_min:Lu177_max]) / dt) * lu177_factor, 2)
+    Iod_act = round((simps((c_Iod*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor, 2)
+
+    ### Calculation of the coefficient of determination (R^2)
+    y_mean = sum(new_counts_mix_smooth)/float(len(new_counts_mix_smooth))
+    ss_tot = sum((yi-y_mean)**2 for yi in new_counts_mix_smooth)
+    ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(c_Lu177m*new_counts_Lu177m_smooth+c_lu177*new_counts_lu177_smooth+c_Iod*new_counts_iod_smooth)))
+    r2 = round(1 - (ss_err/ss_tot), 3)
+
+    ### converting channels to energies, for plots
+    energy_channels_Lu177m = []
+    for channel in channels_Lu177m:
+        energy = lin(channel, 0.46079, 0)
+        energy_channels_Lu177m.append(energy)
+    
+    # converting channels to energies
+    energy_channels_lu177 = []
+    for channel in channels_lu177:
+        energy = lin(channel, 0.46079, 0)
+        energy_channels_lu177.append(energy)
+
+    energy_channels_iod = []
+    for channel in channels_iod:
+        energy = lin(channel, 0.46079, 0)
+        energy_channels_iod.append(energy)
+
+    energy_channels_mix = []
+    for channel in channels_iod:
+        energy = lin(channel, 0.46079, 0)
+        energy_channels_mix.append(energy)
+
+    ### Define plots  
+    ax21.clear()
+    ax22.clear()
+    ax23.clear()
+    ax24.clear()
+    ax25.clear()
+    ax26.clear()
+    
+    # Lu177m Spectrum (normalized)
+    ax21.plot(np.asarray(energy_channels_Lu177m), new_counts_Lu177m, label='Lu177m Spectrum (normalized)')
+    ax21.plot(np.asarray(energy_channels_Lu177m), new_counts_Lu177m_smooth, label='Lu177m Spectrum (smooth)')
+    ax21.set_ylabel('x_i/sum(x_i)')
+    ax21.legend()
+
+    # Lu177 Spectrum (normalized)
+    ax22.plot(np.asarray(energy_channels_lu177), new_counts_lu177, label='Lu177 Spectrum (normalized)')
+    ax22.plot(np.asarray(energy_channels_lu177), new_counts_lu177_smooth, label='Lu177 Spectrum (smooth)')
+    ax22.set_ylabel('x_i/sum(x_i)')
+    ax22.legend()
+
+    # Iod Spectrum (normalized)
+    ax23.plot(np.asarray(energy_channels_iod), new_counts_iod, label='Iod Spectrum (normalized)')
+    ax23.plot(np.asarray(energy_channels_iod), new_counts_iod_smooth, label='Iod Spectrum (smooth)')
+    ax23.set_ylabel('x_i/sum(x_i)')
+    ax23.legend()
+
+    # Mixture (measured)
+    ax24.plot(np.asarray(energy_channels_mix), new_counts_mix, label='Mixture (measured)')
+    ax24.plot(np.asarray(energy_channels_mix), new_counts_mix_smooth, label='Mixture (smooth)')
+    ax24.set_ylabel('counts')
+    ax24.legend()
+
+    # Lu177m + Lu177 + Iod (Calculated)
+    ax25.plot(np.asarray(energy_channels_Lu177m), res.x[0]*new_counts_Lu177m_smooth, color='red', label='Lu177m (calculated+smooth)')
+    ax25.plot(np.asarray(energy_channels_lu177), res.x[1]*new_counts_lu177_smooth, color='orange', label='Lu177 (calculated+smooth)')
+    ax25.plot(np.asarray(energy_channels_iod), res.x[2]*new_counts_iod_smooth, color='green', label='Iod (calculated+smooth)')
+    ax25.plot(np.asarray(energy_channels_mix), (res.x[0]*new_counts_Lu177m_smooth+res.x[1]*new_counts_lu177_smooth+res.x[2]*new_counts_iod_smooth), color='black', label='Lu177m + Lu177 + Iod (smooth)')
+    ax25.set_ylabel('counts')
+    ax25.legend()
+
+    # Diff
+    ax26.plot(np.asarray(energy_channels_mix), new_counts_mix_smooth, label='Mixture (smooth)')
+    ax26.plot(np.asarray(energy_channels_mix), (res.x[0]*new_counts_Lu177m_smooth+res.x[1]*new_counts_lu177_smooth+res.x[2]*new_counts_iod_smooth), color='black', label='Lu + Iod (smooth)')
+    ax26.plot(np.asarray(energy_channels_mix), (new_counts_mix_smooth-(res.x[0]*new_counts_Lu177m_smooth+res.x[1]*new_counts_lu177_smooth+res.x[2]*new_counts_iod_smooth)), color='red', label='Diff')
+    ax26.set_xlabel('Energy (keV)')
+    ax26.set_ylabel('counts')
+    ax26.legend()
 
 #%% Read reference (pure) spectrums
 
 # reference (pure) spectrum for iod and lu
 py_path = os.getcwd()
 
-data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
+data_path_Lu177m = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
+data_path_lu177 = py_path + '/Data/Reference/AWM_Lu177_7000Bq_3600s_040221.csv'
 data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
-### Lu: pure (reference)spectrum
-channels_lu = []
-counts_lu = []
-with open(data_path_lu, "r") as f:
+### Lu177m: pure (reference)spectrum
+channels_Lu177m = []
+counts_Lu177m = []
+with open(data_path_Lu177m, "r") as f:
     reader = csv.reader(f, delimiter=";")
     
     # choose the right start parameter (first channel)
@@ -263,20 +424,47 @@ with open(data_path_lu, "r") as f:
             break
 
     for i, line in enumerate(reader):
-        channels_lu.append(int(line[0]))
+        channels_Lu177m.append(int(line[0]))
         # avoid negative counts
         if float(line[1]) < 0.0:
-            counts_lu.append(0)
+            counts_Lu177m.append(0)
         else:
-            counts_lu.append(float(line[1]))
+            counts_Lu177m.append(float(line[1]))
 
 # normalization
-new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
+new_counts_Lu177m = np.asarray([i/sum(counts_Lu177m) for i in counts_Lu177m])
 
 #savgol filter
-winsize_lu, new_counts_lu_smooth, r2_lu  = optimized_smoothing(new_counts_lu)
+winsize_Lu177m, new_counts_Lu177m_smooth, r2_Lu177m  = optimized_smoothing(new_counts_Lu177m)
 
-# Iod: pure (reference)spectrum
+### Lu177: pure (reference)spectrum
+channels_lu177 = []
+counts_lu177 = []
+with open(data_path_lu177, "r") as f:
+    reader = csv.reader(f, delimiter=";")
+    
+    # choose the right start parameter (first channel)
+    for line in reader:
+        if line == []:
+            continue
+        if line[0] == 'Kanal':
+            break
+
+    for i, line in enumerate(reader):
+        channels_lu177.append(int(line[0]))
+        # avoid negative counts
+        if float(line[1]) < 0.0:
+            counts_lu177.append(0)
+        else:
+            counts_lu177.append(float(line[1]))
+
+# normalization
+new_counts_lu177 = np.asarray([i/sum(counts_lu177) for i in counts_lu177])
+
+#savgol filter
+winsize_lu177, new_counts_lu177_smooth, r2_lu177  = optimized_smoothing(new_counts_lu177)
+
+### Iod131: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
 bg_iod = []
@@ -323,7 +511,7 @@ def popupmsg(msg):
 def Help():
     popup = tk.Tk()
     popup.wm_title("Help")
-    label = ttk.Label(popup, text='''For descriptions around the program read help.txt please! Or follow us on GitHub.''', font=NORM_FONT)
+    label = ttk.Label(popup, text=("""For descriptions around the program read help.txt please! Or follow us on GitHub."""), font=NORM_FONT)
     label.pack(side="top", fill="x", pady=10)
     B1 = ttk.Button(popup, text="Okay", command = popup.destroy)
     B1.pack()
@@ -332,8 +520,8 @@ def Help():
 def Impressum():
     popup = tk.Tk()
     popup.wm_title("Impressum")
-    label = ttk.Label(popup, text='''Author: Eric Einspaenner, Clinic of Radiology and Nuclear Medicine, UMMD (Germany)
-This software is distributed under an open source license, see LICENSE.txt for details.''', font=NORM_FONT)
+    label = ttk.Label(popup, text=("""Author: Eric Einspaenner, Clinic of Radiology and Nuclear Medicine, UMMD (Germany)
+    This software is distributed under an open source license, see LICENSE.txt for details."""), font=NORM_FONT)
     label.pack(side="top", fill="x", pady=10)
     B1 = ttk.Button(popup, text="Okay", command = popup.destroy)
     B1.pack()
@@ -348,6 +536,7 @@ class SpectrumDeconv(tk.Tk):
 
         tk.Tk.iconbitmap(self,default="tmp/nuclear.ico")
         tk.Tk.wm_title(self, "Spectrum Deconvolution")
+        tk.Tk.geometry(self, "1400x1200")
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand = True)
@@ -412,9 +601,12 @@ class SpectrumDeconv(tk.Tk):
         load_data(filename)
     
     # Button: call calculation function
-    def button_SpectrumDeconvolution(self):
-        spectrum_deconv()
+    def button_SpectrumDeconvolution_2nuclids(self):
+        spectrum_deconv_2nuclids()
 
+    # Button: call calculation function
+    def button_SpectrumDeconvolution_3nuclids(self):
+        spectrum_deconv_3nuclids()
         
 class StartPage(tk.Frame):
 
@@ -422,6 +614,10 @@ class StartPage(tk.Frame):
         tk.Frame.__init__(self,parent)
         
         label = ttk.Label(self, text="Home", font=LARGE_FONT)
+        label.pack(pady=10,padx=10)
+        
+        label = ttk.Label(self, text=("""SpectrDeconv is a open-source software tool.
+        There is no promise of warranty."""), font=LARGE_FONT)
         label.pack(pady=10,padx=10)
 
         button = ttk.Button(self, text="2 nuclids: Lu177m, I131",
@@ -447,11 +643,11 @@ class Nuclids_2(tk.Frame):
         buttonImport = ttk.Button(self, text="Import", command=controller.buttonImport)
         buttonImport.pack()
     
-        buttonCalc = ttk.Button(self, text="Start Calculation", command=controller.button_SpectrumDeconvolution)
+        buttonCalc = ttk.Button(self, text="Start Calculation", command=controller.button_SpectrumDeconvolution_2nuclids)
         buttonCalc.pack()
 
         canvas = FigureCanvasTkAgg(fig, self)
-        canvas.draw()
+        #canvas.draw()
         canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
         toolbar = NavigationToolbar2Tk(canvas, self)
@@ -470,11 +666,13 @@ class Nuclids_3(tk.Frame):
                             command=lambda: controller.show_frame(StartPage))
         buttonHome.pack()
         
-        f = Figure(figsize=(5,5), dpi=100)
-        a = f.add_subplot(111)
-        a.plot([1,2,3,4,5,6,7,8],[5,6,1,3,8,9,3,5])
+        buttonImport = ttk.Button(self, text="Import", command=controller.buttonImport)
+        buttonImport.pack()
+    
+        buttonCalc = ttk.Button(self, text="Start Calculation", command=controller.button_SpectrumDeconvolution_3nuclids)
+        buttonCalc.pack()
 
-        canvas = FigureCanvasTkAgg(f, self)
+        canvas = FigureCanvasTkAgg(fig2, self)
         canvas.draw()
         canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
@@ -483,5 +681,11 @@ class Nuclids_3(tk.Frame):
         canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
 
+#%% start application
+
 app = SpectrumDeconv()
+###
+ani_2nuclids = animation.FuncAnimation(fig, spectrum_deconv_2nuclids, blit=False)
+ani_3nuclids = animation.FuncAnimation(fig2, spectrum_deconv_3nuclids, blit=False)
+###
 app.mainloop()
