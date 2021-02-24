@@ -243,6 +243,8 @@ def spectrum_deconv_2nuclids():
     ax4.plot(np.asarray(energy_channels_Lu177m), c_Lu177m*new_counts_Lu177m_smooth, color='red', label='Lu (calculated+smooth)')
     ax4.plot(np.asarray(energy_channels_iod), c_Iod*new_counts_iod_smooth, color='green', label='Iod (calculated+smooth)')
     ax4.plot(np.asarray(energy_channels_mix), (c_Lu177m*new_counts_Lu177m_smooth+c_Iod*new_counts_iod_smooth), color='black', label='Lu + Iod (smooth)')
+    ax4.text(800, 300, 'Lu177m-Activity [Bq]: ' + str(Lu177m_act), fontsize=18)
+    ax4.text(800, 200, 'I131-Activity [Bq]: ' + str(Iod_act), fontsize=18)
     ax4.set_ylabel('counts')
     ax4.legend()
 
@@ -388,6 +390,9 @@ def spectrum_deconv_3nuclids():
     ax25.plot(np.asarray(energy_channels_lu177), res.x[1]*new_counts_lu177_smooth, color='orange', label='Lu177 (calculated+smooth)')
     ax25.plot(np.asarray(energy_channels_iod), res.x[2]*new_counts_iod_smooth, color='green', label='Iod (calculated+smooth)')
     ax25.plot(np.asarray(energy_channels_mix), (res.x[0]*new_counts_Lu177m_smooth+res.x[1]*new_counts_lu177_smooth+res.x[2]*new_counts_iod_smooth), color='black', label='Lu177m + Lu177 + Iod (smooth)')
+    ax25.text(800, 300, 'Lu177m-Activity [Bq]: ' + str(Lu177m_act), fontsize=17)
+    ax25.text(800, 200, 'Lu177-Activity [Bq]: ' + str(lu177_act), fontsize=17)
+    ax25.text(800, 100, 'I131-Activity [Bq]: ' + str(Iod_act), fontsize=17)
     ax25.set_ylabel('counts')
     ax25.legend()
 
