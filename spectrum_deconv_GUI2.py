@@ -125,6 +125,8 @@ def load_data(file):
 
     #savgol filter
     winsize_mix, new_counts_mix_smooth, r2_mix  = optimized_smoothing(new_counts_mix)
+    
+    #new_counts_mix_smooth = savgol_filter(new_counts_mix, 11, 3)
 
 ### 2 NUCLIDS
 # objective function: Least square
