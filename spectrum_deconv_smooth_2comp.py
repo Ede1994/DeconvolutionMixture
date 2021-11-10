@@ -15,8 +15,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.optimize import minimize, Bounds
-from scipy.integrate import simps
+from scipy.integrate import simps, trapezoid
 from scipy.signal import savgol_filter # Savitzky-Golay filter for smoothing
+
 
 #%% functions
 
@@ -60,6 +61,7 @@ def callbackF(x):
     print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func(x, new_counts_mix_smooth, new_counts_lu, new_counts_iod)))
     Nfeval += 1
 
+
 #%% data path and files
 
 py_path = os.getcwd()
@@ -77,18 +79,29 @@ data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 #data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
 
 # Mixture: 3600s
-data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+data_path_mix = py_path + '/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
+#data_path_mix = py_path + '/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
+#data_path_mix = py_path + '/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
 dt = 3600.
 
-#%% read data
 
-# Lu: pure (reference)spectrum
+#%% Lu: pure (reference)spectrum
 channels_lu = []
 counts_lu = []
+with open(data_path_lu, "r") as f:
+    reader = csv.reader(f, delimiter=";")
+
+    # choose the right start parameter (first channel) and set energy2channel CF
+    for finder in reader:
+        if finder == []:
+            continue   
+        if finder[0] == 'Kalibrierfaktor:':
+            CF_lu = float(finder[1])
+        if finder[0] == 'Kanal':
+            number = reader.line_num
+
 with open(data_path_lu, "r") as f:
     reader = csv.reader(f, delimiter=";")
     
@@ -113,35 +126,44 @@ new_counts_lu = np.asarray([i/sum(counts_lu) for i in counts_lu])
 #savgol filter
 winsize_lu, new_counts_lu_smooth, r2_lu  = optimized_smoothing(new_counts_lu)
 
-print('\n--- R^2 Lu177m ---')
+print('\n---- Lu177m ----')
+print('Start Channel: {}, End Channel: {}'.format(channels_lu[0], channels_lu[-1]))
+print('CF lu spectrum:', CF_lu)
 print('Window size:', winsize_lu)
 print('R^2:', round(r2_lu, 3))
 print('---------------------')
 
-# Iod: pure (reference)spectrum
+
+#%% Iod: pure (reference)spectrum
 channels_iod = []
 counts_iod = []
 bg_iod = []
 with open(data_path_iod, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
-    # choose the right start parameter (first channel)
-    for line in reader:
-        if line == []:
-            continue
-        if line[0] == 'Kanal':
-            break
+    # choose the right start parameter (first channel) and set energy2channel CF
+    for finder in reader:
+        if finder == []:
+            continue   
+        if finder[0] == 'Kalibrierfaktor:':
+            CF_iod = float(finder[1])
+        if finder[0] == 'Kanal':
+            number = reader.line_num
+
+with open(data_path_iod, "r") as f:
+    reader = csv.reader(f, delimiter=";")
 
     # read dataset and fill lists
     for i, line in enumerate(reader):
-        channels_iod.append(int(line[0]))
-        counts_iod.append(float(line[1]))
+        if i > number-1:
+            channels_iod.append(int(line[0]))
+            counts_iod.append(float(line[1]))
 
-        # depends on separate background column
-        if len(line) == 2:
-            bg_iod = np.linspace(0, 0, len(counts_iod))
-        if len(line) == 3:
-            bg_iod.append(float(line[2]))
+            # depends on separate background column
+            if len(line) == 2:
+                bg_iod = np.linspace(0, 0, len(counts_iod))
+            if len(line) == 3:
+                bg_iod.append(float(line[2]))
 
 counts_iod = np.asarray(np.subtract(counts_iod, bg_iod))
 # avoid negative counts
@@ -152,35 +174,44 @@ new_counts_iod = np.asarray([i/sum(counts_iod) for i in counts_iod])
 #savgol filter
 winsize_iod, new_counts_iod_smooth, r2_iod  = optimized_smoothing(new_counts_iod)
 
-print('\n--- R^2 Iod ---')
+print('\n---- Iod ----')
+print('Start Channel: {}, End Channel: {}'.format(channels_iod[0], channels_iod[-1]))
+print('CF iod spectrum:', CF_iod)
 print('Window size:', winsize_iod)
 print('R^2:', round(r2_iod, 3))
 print('---------------------')
 
-# Mix spectrum
+
+#%% Mix spectrum
 channels_mix = []
 counts_mix = []
 bg_mix = []
 with open(data_path_mix, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
-    # choose the right start parameter (first channel)
-    for line in reader:
-        if line == []:
+    # choose the right start parameter (first channel) and set energy2channel CF
+    for finder in reader:
+        if finder == []:
             continue
-        if line[0] == 'Kanal':
-            break
+        if finder[0] == 'Kalibrierfaktor:':
+            CF_mix = float(finder[1])
+        if finder[0] == 'Kanal':
+            number = reader.line_num
+
+with open(data_path_mix, "r") as f:
+    reader = csv.reader(f, delimiter=";")
 
     # read dataset and fill lists
     for i, line in enumerate(reader):
-        channels_mix.append(int(line[0]))
-        counts_mix.append(float(line[1]))
+        if i > number-1:
+            channels_mix.append(int(line[0]))
+            counts_mix.append(float(line[1]))
 
-        # depends on separate background column
-        if len(line) == 2:
-            bg_mix = np.linspace(0, 0, len(counts_mix))
-        if len(line) == 3:
-            bg_mix.append(float(line[2]))
+            # depends on separate background column
+            if len(line) == 2:
+                bg_mix = np.linspace(0, 0, len(counts_mix))
+            if len(line) == 3:
+                bg_mix.append(float(line[2]))
 
 new_counts_mix = np.asarray(np.subtract(counts_mix, bg_mix))
 
@@ -190,28 +221,32 @@ new_counts_mix[new_counts_mix < 0] = 0
 #savgol filter
 winsize_mix, new_counts_mix_smooth, r2_mix  = optimized_smoothing(new_counts_mix)
 
-print('\n--- R^2 Mixture ---')
+print('\n---- Mixture ----')
+print('Start Channel: {}, End Channel: {}'.format(channels_mix[0], channels_mix[-1]))
+print('CF mix spectrum:', CF_mix)
 print('Window size:', winsize_mix)
 print('R^2:', round(r2_mix, 3))
 print('---------------------')
+
 
 #%% Converting channels to energies
 
 # converting channels to energies
 energy_channels_lu = []
 for channel in channels_lu:
-    energy = lin(channel, 0.46079, 0)
+    energy = lin(channel, CF_lu, 0)
     energy_channels_lu.append(energy)
 
 energy_channels_iod = []
 for channel in channels_iod:
-    energy = lin(channel, 0.46079, 0)
+    energy = lin(channel, CF_iod, 0)
     energy_channels_iod.append(energy)
 
 energy_channels_mix = []
 for channel in channels_mix:
-    energy = lin(channel, 0.46079, 0)
+    energy = lin(channel, CF_mix, 0)
     energy_channels_mix.append(energy)
+
 
 #%% Optimization
 # scipy: minimize
@@ -229,23 +264,25 @@ bnds = Bounds([0.0, 0.0], [10000000., 10000000.])
 
 # optimize minimize 
 res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
-               bounds=bnds, tol=0.001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
+               bounds=bnds, tol=0.0001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
 
 print('---------------------------')
 
 print(res)
 
+
 #%% Calculations
 
 ### Define specific windows
 # Lu boundaries, A window (width: 72)
-Lu_peak = 126 #np.argmax(new_counts_lu)
+Lu_peak = int(59/CF_lu) #np.argmax(new_counts_lu)
 Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
+Lu_width = Lu_max - Lu_min
 
 # Iod boundaries, E window (width: 236)
-Iod_peak = 791 #np.argmax(new_counts_iod)
-Iod_min, Iod_max = Iod_peak - 118, Iod_peak + 118
-
+Iod_peak = int(370/CF_iod) #np.argmax(new_counts_iod)
+Iod_min, Iod_max = Iod_peak - 117, Iod_peak + 118
+Iod_width = Iod_max - Iod_min
 
 ### Choose the right calibration factor 
 # Lu: depends on cps in window A
@@ -274,8 +311,10 @@ elif cps_iod_winE >= 10000:
 
 
 ### Calculation of specific activities
-Lu_act = (simps((res.x[0]*new_counts_lu_smooth)[Lu_min:Lu_max], channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
-Iod_act = (simps((res.x[1]*new_counts_iod_smooth)[Iod_min:Iod_max], channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
+Lu_act = (simps((res.x[0]*new_counts_lu_smooth[Lu_min:Lu_max]), channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
+Lu_act2 = (trapezoid((res.x[0]*new_counts_lu_smooth[Lu_min:Lu_max]), channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
+Iod_act = (simps((res.x[1]*new_counts_iod_smooth[Iod_min:Iod_max]), channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
+Iod_act2 = (trapezoid((res.x[1]*new_counts_iod_smooth[Iod_min:Iod_max]), channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
 
 
 ### Calculation of the coefficient of determination (R^2)
@@ -284,12 +323,13 @@ ss_tot = sum((yi-y_mean)**2 for yi in new_counts_mix_smooth)
 ss_err = sum((yi-fi)**2 for yi,fi in zip(new_counts_mix_smooth,(res.x[0]*new_counts_lu_smooth+res.x[1]*new_counts_iod_smooth)))
 r2 = 1 - (ss_err/ss_tot)
 
+
 #%% Print results
 
 # print energy windows
 print('\n--- Energy Windows ---')
-print('Lu: Peak {}, Min {}, Max {}'.format(Lu_peak, Lu_min, Lu_max))
-print('Iod: Peak {}, Min {}, Max {}'.format(Iod_peak, Iod_min, Iod_max))
+print('Lu: Peak {}, Min {}, Max {}, Width {}'.format(Lu_peak, Lu_min, Lu_max, Lu_width))
+print('Iod: Peak {}, Min {}, Max {}, Width {}'.format(Iod_peak, Iod_min, Iod_max, Iod_width))
 print('---------------------')
 
 # results of normalization; area should be 1
@@ -312,14 +352,17 @@ print('-------------------------')
 
 # print specific activities
 print('\n--- Calculated Activities ---')
-print('Lu activity [Bq]:', round(Lu_act , 2))
-print('Iod activity [Bq]:', round(Iod_act, 2))
+print('Lu activity [Bq]: {} (Simpson)'.format(round(Lu_act , 2)))
+print('Lu activity [Bq]: {} (Trapezoid)'.format(round(Lu_act2 , 2)))
+print('Iod activity [Bq]: {} (Simpson)'.format(round(Iod_act, 2)))
+print('Iod activity [Bq]: {} (Trapezoid)'.format(round(Iod_act2, 2)))
 print('-----------------------------')
 
 # print the coefficient of determination (R^2)
 print('\n--- Coefficient Of Determination ---')
 print('R^2:', round(r2, 3))
 print('------------------------------------')
+
 
 #%% plots
 
