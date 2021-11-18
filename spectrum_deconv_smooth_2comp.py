@@ -29,16 +29,18 @@ def sorted_alphanumeric(data):
 
 # optimize smoothing filter
 def optimized_smoothing(counts_arr):
-    winsize = 5 # must be larger than polynomial order
+    winsize = 7 # must be larger than polynomial order
     for num in range(1000):
-        counts_smooth_arr = savgol_filter(counts_arr, winsize, 3) # window size, polynomial order
+        counts_smooth_arr = savgol_filter(counts_arr, winsize, 2) # window size, polynomial order
 
         y_mean = sum(counts_arr)/float(len(counts_arr))
         ss_tot = sum((yi-y_mean)**2 for yi in counts_arr)
         ss_err = sum((yi-fi)**2 for yi,fi in zip(counts_arr, counts_smooth_arr))
         r2 = 1 - (ss_err/ss_tot)
     
-        if r2 > 0.991:
+        if r2 > 0.91:
+            break
+        elif winsize >= 15:
             break
         else:
             winsize += 2
@@ -70,21 +72,21 @@ data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
 data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 # pure Iod
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Iod/1000Bq_20201106_300s.csv'
+#data_path_mix = py_path + '/Data/Iod/1000Bq_20201106_300s.csv'
 
 # pure Lu
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Lu/100Bq_20200923_300s.csv'
+data_path_mix = py_path + '/Data/Lu/100er/100Bq_201008_300s.csv'
 
 # Mixture: 500Bq iod and 200Bq Lu (300s)
-#data_path_mix = 'C:/Users/Eric/Documents/GitHub/DeconvolutionMixture/Data/Mix/I-131_500Bq_Lu-177m_200Bq_300s_5.csv'
+#data_path_mix = py_path + '/Data/Mix_sample2/I-131_500Bq_Lu-177m_200Bq_300s_0.csv'
 
 # Mixture: 3600s
-data_path_mix = py_path + '/Data/Mix2/AWM_MIX_100vs100_3600s.csv'
-#data_path_mix = py_path + '/Data/Mix2/AWM_MIX_50vs97_3600s.csv'
-#data_path_mix = py_path + '/Data/Mix2/AWM_MIX_5vs86_3600s.csv'
+#data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_100vs100_3600s.csv'
+#data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_50vs97_3600s.csv'
+#data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
-dt = 3600.
+dt = 300.
 
 
 #%% Lu: pure (reference)spectrum
@@ -260,24 +262,41 @@ print('{0:4s}       {1:9s}      {2:9s}       {3:9s}'.format('Iter', ' c_Lu', ' c
 xinit = np.array([0, 0])
 
 # bounds
-bnds = Bounds([0.0, 0.0], [10000000., 10000000.])
+bnds = Bounds([0.0, 0.0], [1000000000., 1000000000.])
 
-# optimize minimize 
-res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
-               bounds=bnds, tol=0.0001, callback=callbackF, options={'maxiter':2000 ,'disp': True})
+# optimize minimize
+# Unconstrained minimization
+res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='BFGS',\
+               tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
 
-print('---------------------------')
+if res.x[0] < 0:
+    res.x[0] = 0
+elif res.x[1] < 0:
+    res.x[1] = 0
 
-print(res)
+# Bound-Constrained minimization 
+#res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
+#               bounds=bnds, tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
+
+print('--- End Optimization ---')
+
+print('\n---------------------------\n')
+
+print('Convergence Message:\n', res)
 
 
 #%% Calculations
 
 ### Define specific windows
 # Lu boundaries, A window (width: 72)
-Lu_peak = int(59/CF_lu) #np.argmax(new_counts_lu)
-Lu_min, Lu_max = Lu_peak - 36, Lu_peak + 36
-Lu_width = Lu_max - Lu_min
+Lu_peak_A = int(59/CF_lu) #np.argmax(new_counts_lu)
+Lu_min_A, Lu_max_A = Lu_peak_A - 36, Lu_peak_A + 36
+Lu_width_A = Lu_max_A - Lu_min_A
+
+# Lu boundaries, D window (width: 298)
+Lu_peak_D = int(169.5/CF_lu) #np.argmax(new_counts_lu)
+Lu_min_D, Lu_max_D = Lu_peak_D - 149, Lu_peak_D + 149
+Lu_width_D = Lu_max_D - Lu_min_D
 
 # Iod boundaries, E window (width: 236)
 Iod_peak = int(370/CF_iod) #np.argmax(new_counts_iod)
@@ -286,14 +305,20 @@ Iod_width = Iod_max - Iod_min
 
 ### Choose the right calibration factor 
 # Lu: depends on cps in window A
-cps_lu_winA = (sum(counts_lu[Lu_min:Lu_max])/300.)
+cps_lu_winA = sum(counts_lu[Lu_min_A:Lu_max_A]) / dt
+cps_lu_winD = sum(counts_lu[Lu_min_D:Lu_max_D]) / dt
 
-if cps_lu_winA < 50:
-    lu_factor = 12.68
-elif 50 <= cps_lu_winA < 500:
-    lu_factor = 11.5
-elif 500 <= cps_lu_winA:
-    lu_factor = 10.88
+lu_factor_A = 12.68
+lu_factor_D = 4.81
+
+# =============================================================================
+# if cps_lu_winA < 50:
+#     lu_factor = 12.68
+# elif 50 <= cps_lu_winA < 500:
+#     lu_factor = 11.5
+# elif 500 <= cps_lu_winA:
+#     lu_factor = 10.88
+# =============================================================================
 
 # Iod: depends on cps in window E
 cps_iod_winE = sum(new_counts_mix_smooth[Iod_min:Iod_max]) / dt
@@ -311,8 +336,15 @@ elif cps_iod_winE >= 10000:
 
 
 ### Calculation of specific activities
-Lu_act = (simps((res.x[0]*new_counts_lu_smooth[Lu_min:Lu_max]), channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
-Lu_act2 = (trapezoid((res.x[0]*new_counts_lu_smooth[Lu_min:Lu_max]), channels_lu[Lu_min:Lu_max]) / dt) * lu_factor
+# Lu - A window
+Lu_act_A = (simps((res.x[0]*new_counts_lu_smooth[Lu_min_A:Lu_max_A]), channels_lu[Lu_min_A:Lu_max_A]) / dt) * lu_factor_A
+Lu_act_A2 = (trapezoid((res.x[0]*new_counts_lu_smooth[Lu_min_A:Lu_max_A]), channels_lu[Lu_min_A:Lu_max_A]) / dt) * lu_factor_A
+
+# Lu - D window
+Lu_act_D = (simps((res.x[0]*new_counts_lu_smooth[Lu_min_D:Lu_max_D]), channels_lu[Lu_min_D:Lu_max_D]) / dt) * lu_factor_D
+Lu_act_D2 = (trapezoid((res.x[0]*new_counts_lu_smooth[Lu_min_D:Lu_max_D]), channels_lu[Lu_min_D:Lu_max_D]) / dt) * lu_factor_D
+
+# Iod - E window
 Iod_act = (simps((res.x[1]*new_counts_iod_smooth[Iod_min:Iod_max]), channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
 Iod_act2 = (trapezoid((res.x[1]*new_counts_iod_smooth[Iod_min:Iod_max]), channels_iod[Iod_min:Iod_max]) / dt) * iod_factor
 
@@ -328,8 +360,9 @@ r2 = 1 - (ss_err/ss_tot)
 
 # print energy windows
 print('\n--- Energy Windows ---')
-print('Lu: Peak {}, Min {}, Max {}, Width {}'.format(Lu_peak, Lu_min, Lu_max, Lu_width))
-print('Iod: Peak {}, Min {}, Max {}, Width {}'.format(Iod_peak, Iod_min, Iod_max, Iod_width))
+print('Lu - window A: Peak {}, Min {}, Max {}, Width {}'.format(Lu_peak_A, Lu_min_A, Lu_max_A, Lu_width_A))
+print('Lu - window D: Peak {}, Min {}, Max {}, Width {}'.format(Lu_peak_D, Lu_min_D, Lu_max_D, Lu_width_D))
+print('Iod - window E: Peak {}, Min {}, Max {}, Width {}'.format(Iod_peak, Iod_min, Iod_max, Iod_width))
 print('---------------------')
 
 # results of normalization; area should be 1
@@ -346,16 +379,19 @@ print('-------------------------')
 
 # print the calibration factors (depends on energy windows)
 print('\n--- Calibration Factors ---')
-print('Lu:', lu_factor)
-print('Iod:', iod_factor)
+print('Lu: counts window A: {} -> CF: {}'.format(round(cps_lu_winA, 1), lu_factor_A))
+print('Lu: counts window D: {} -> CF: {}'.format(round(cps_lu_winD, 1), lu_factor_D))
+print('Iod: counts window E: {} -> CF: {}'.format(round(cps_iod_winE, 1), iod_factor))
 print('-------------------------')
 
 # print specific activities
 print('\n--- Calculated Activities ---')
-print('Lu activity [Bq]: {} (Simpson)'.format(round(Lu_act , 2)))
-print('Lu activity [Bq]: {} (Trapezoid)'.format(round(Lu_act2 , 2)))
-print('Iod activity [Bq]: {} (Simpson)'.format(round(Iod_act, 2)))
-print('Iod activity [Bq]: {} (Trapezoid)'.format(round(Iod_act2, 2)))
+print('Lu activity - window A [Bq]: {} (Simpson)'.format(round(Lu_act_A , 2)))
+print('Lu activity - window A [Bq]: {} (Trapezoid)'.format(round(Lu_act_A2 , 2)))
+print('Lu activity - window D [Bq]: {} (Simpson)'.format(round(Lu_act_D , 2)))
+print('Lu activity - window D [Bq]: {} (Trapezoid)'.format(round(Lu_act_D2 , 2)))
+print('Iod activity - window E [Bq]: {} (Simpson)'.format(round(Iod_act, 2)))
+print('Iod activity - window E [Bq]: {} (Trapezoid)'.format(round(Iod_act2, 2)))
 print('-----------------------------')
 
 # print the coefficient of determination (R^2)
