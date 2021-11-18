@@ -72,21 +72,21 @@ data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
 data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 # pure Iod
-#data_path_mix = py_path + '/Data/Iod/1000Bq_20201106_300s.csv'
+#data_path_mix = py_path + '/Data/Iod/1000Bq_20201007_300s.csv'
 
 # pure Lu
-data_path_mix = py_path + '/Data/Lu/100er/100Bq_201008_300s.csv'
+#data_path_mix = py_path + '/Data/Lu/100er/100Bq_200923_300s.csv'
 
 # Mixture: 500Bq iod and 200Bq Lu (300s)
-#data_path_mix = py_path + '/Data/Mix_sample2/I-131_500Bq_Lu-177m_200Bq_300s_0.csv'
+#data_path_mix = py_path + '/Data/Mix_sample2/I-131_500Bq_Lu-177m_200Bq_300s_6.csv'
 
 # Mixture: 3600s
 #data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_100vs100_3600s.csv'
 #data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_50vs97_3600s.csv'
-#data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_5vs86_3600s.csv'
+data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
-dt = 300.
+dt = 3600.
 
 
 #%% Lu: pure (reference)spectrum
