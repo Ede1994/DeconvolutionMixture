@@ -76,25 +76,6 @@ parser.add_argument('-sMix', '--sMixture', help='File for Mixture-spectrum')
 parser.add_argument('-t', '--time', help='Measuring time for mixture spectrum', type=float)
 args = parser.parse_args()
 
-py_path = os.getcwd()
-
-data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
-data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
-
-# pure Iod
-#data_path_mix = py_path + '/Data/Iod/1000Bq_20201118_300s.csv'
-
-# pure Lu
-#data_path_mix = py_path + '/Data/Lu/100er/100Bq_210611_300s.csv'
-
-# Mixture: 500Bq iod and 200Bq Lu (300s)
-#data_path_mix = py_path + '/Data/Mix_sample2/I-131_500Bq_Lu-177m_200Bq_300s_6.csv'
-
-# Mixture: 3600s
-data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_100vs100_3600s.csv'
-#data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_50vs97_3600s.csv'
-#data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_5vs86_3600s.csv'
-
 # define measuring time
 dt = args.time
 
