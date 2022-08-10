@@ -4,6 +4,7 @@
 Author: Eric Einspänner
 
 Spectrum deconvolution for 2 components: Lu177m, I131
+Supports argparse for Shell integration
 
 This program is free software.
 """
@@ -11,6 +12,7 @@ import re
 import os
 import csv
 import string
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,6 +69,13 @@ def callbackF(x):
 
 #%% data path and files
 
+parser = argparse.ArgumentParser(description='Spectrum deconvolution for a mixture')
+parser.add_argument('-rLu', '--refLu', help='Reference file for Lu-spectrum')
+parser.add_argument('-rIod', '--refIod', help='Reference file for Iod-spectrum')
+parser.add_argument('-sMix', '--sMixture', help='File for Mixture-spectrum')
+parser.add_argument('-t', '--time', help='Measuring time for mixture spectrum', type=float)
+args = parser.parse_args()
+
 py_path = os.getcwd()
 
 data_path_lu = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
@@ -87,13 +96,14 @@ data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_100vs100_3600s.csv'
 #data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_5vs86_3600s.csv'
 
 # define measuring time
-dt = 3600.
+dt = args.time
 
 
 #%% Lu: pure (reference)spectrum
 channels_lu = []
 counts_lu = []
-with open(data_path_lu, "r") as f:
+
+with open(args.refLu, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
     # choose the right start parameter (first channel) and set energy2channel CF
@@ -105,7 +115,7 @@ with open(data_path_lu, "r") as f:
         if finder[0] == 'Kanal':
             number = reader.line_num
 
-with open(data_path_lu, "r") as f:
+with open(args.refLu, "r") as f:
     reader = csv.reader(f, delimiter=";")
     
     # choose the right start parameter (first channel)
@@ -141,7 +151,7 @@ print('---------------------')
 channels_iod = []
 counts_iod = []
 bg_iod = []
-with open(data_path_iod, "r") as f:
+with open(args.refIod, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
     # choose the right start parameter (first channel) and set energy2channel CF
@@ -153,7 +163,7 @@ with open(data_path_iod, "r") as f:
         if finder[0] == 'Kanal':
             number = reader.line_num
 
-with open(data_path_iod, "r") as f:
+with open(args.refIod, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
     # read dataset and fill lists
@@ -189,7 +199,7 @@ print('---------------------')
 channels_mix = []
 counts_mix = []
 bg_mix = []
-with open(data_path_mix, "r") as f:
+with open(args.sMixture, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
     # choose the right start parameter (first channel) and set energy2channel CF
@@ -201,7 +211,7 @@ with open(data_path_mix, "r") as f:
         if finder[0] == 'Kanal':
             number = reader.line_num
 
-with open(data_path_mix, "r") as f:
+with open(args.sMixture, "r") as f:
     reader = csv.reader(f, delimiter=";")
 
     # read dataset and fill lists
