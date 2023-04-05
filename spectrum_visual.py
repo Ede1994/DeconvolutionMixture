@@ -40,7 +40,7 @@ data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_100vs100_3600s.csv'
 
-#%%
+#%% some helpful functions
 def replace_and_convert(item: str, replace_map: dict={';': '', ':': ''}) -> float:
     '''
     Replace/delete special chars and then convert it to float
@@ -214,28 +214,55 @@ if res.x[0] < 0:
 if res.x[1] < 0:
     res.x[1] = 0
 
-print('--- End Optimization ---')
+print('\n--- End Optimization ---')
 print('\n---------------------------\n')
 print('Convergence Message:\n', res)
 
-#%% 
-cps_iod_winE = df_I131_data['Smoothed'].mul(res.x[1]).iloc[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']].sum() / dt_I131
+#%%
+#
+cps_lu177m_winD = df_Lu177m_data['Smoothed'].mul(res.x[0]).iloc[dict_Lu177m_winD['Lu177m_min']-1:dict_Lu177m_winD['Lu177m_max']].sum() / dt_mix
+lu177m_factor = CF_lu177m_winD()
+
+# sum up all counts in energy window E and choose the correct CF
+cps_iod_winE = df_I131_data['Smoothed'].mul(res.x[1]).iloc[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']].sum() / dt_mix
 iod_factor = CF_iod_winE(cps_iod_winE)
 
-# Iod_act_simps = simps(df_I131_data['Smoothed'].mul(res.x[1]).iloc[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']], df_I131_data.index[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']]) / dt_I131 * iod_factor
-# Iod_act_trapezoid = trapezoid(df_I131_data['Smoothed'].mul(res.x[1]).iloc[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']], df_I131_data.index[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']]) / dt_I131 * iod_factor
-
-
-
-Iod_act_simps, Iod_act_trapezoid = calc_activity(df_I131_data, dict_I131_winE['I131_min'], dict_I131_winE['I131_max'], res.x[1], dt_I131, iod_factor)
+# calculate the activity
+Lu177m_act_simps, Lu177m_act_trapezoid = calc_activity(df_Lu177m_data, dict_Lu177m_winD['Lu177m_min'], dict_Lu177m_winD['Lu177m_max'], res.x[0], dt_mix, lu177m_factor)
+Iod_act_simps, Iod_act_trapezoid = calc_activity(df_I131_data, dict_I131_winE['I131_min'], dict_I131_winE['I131_max'], res.x[1], dt_mix, iod_factor)
 
 #%% print results
+print('\n--- Energy Windows ---')
+print('Lu177m - window D:')
+for k, v in dict_Lu177m_winD.items():
+    print('     {}: {}'.format(k, v))
+print('\nI131 - window E:')
+for k, v in dict_I131_winE.items():
+    print('     {}: {}'.format(k, v))
+print('---------------------')
+
+# results of normalization; area should be 1
+print('\n--- Normalization ---')
+print('Area Lu177m spectrum (norm.):', round(simps(df_Lu177m_data['Normalize'], df_Lu177m_data.index), 2))
+print('Area I131 spectrum (norm.):', round(simps(df_I131_data['Normalize'], df_I131_data.index), 2))
+print('---------------------')
+
+# print results of optimizer (c_lu. c_iod) 
+print('\n--- Optimized Factors ---')
+print('c_Lu:', res.x[0])
+print('c_Iod:', res.x[1])
+print('-------------------------')
+
+# print the calibration factors (depends on energy windows)
+print('\n--- Calibration Factors ---')
+print('Lu: counts window D: {} -> CF: {}'.format(round(cps_lu177m_winD, 1), lu177m_factor))
+print('Iod: counts window E: {} -> CF: {}'.format(round(cps_iod_winE, 1), iod_factor))
+print('-------------------------')
+
 # print specific activities
 print('\n--- Calculated Activities ---')
-# print('Lu activity - window A [Bq]: {} (Simpson)'.format(round(Lu_act_A , 2)))
-# print('Lu activity - window A [Bq]: {} (Trapezoid)'.format(round(Lu_act_A2 , 2)))
-# print('Lu activity - window D [Bq]: {} (Simpson)'.format(round(Lu_act_D , 2)))
-# print('Lu activity - window D [Bq]: {} (Trapezoid)'.format(round(Lu_act_D2 , 2)))
+print('Lu activity - window D [Bq]: {} (Simpson)'.format(round(Lu177m_act_simps , 2)))
+print('Lu activity - window D [Bq]: {} (Trapezoid)'.format(round(Lu177m_act_trapezoid , 2)))
 print('Iod activity - window E [Bq]: {} (Simpson)'.format(round(Iod_act_simps, 2)))
 print('Iod activity - window E [Bq]: {} (Trapezoid)'.format(round(Iod_act_trapezoid, 2)))
 print('-----------------------------')
