@@ -55,6 +55,20 @@ def replace_and_convert(item: str, replace_map: dict={';': '', ':': ''}) -> floa
     except ValueError:
         return np.NaN
 
+def r2_coeff(arr1, arr2):
+    '''
+    Calculation of the coefficient of determination (R^2)
+    '''
+    y_mean = sum(arr1) / float(len(arr1))
+
+    ss_tot = sum((yi - y_mean)**2 for yi in arr1)
+
+    ss_err = sum((yi - fi)**2 for yi, fi in zip(arr1, arr2))
+
+    r2 = 1 - (ss_err / ss_tot)
+
+    return r2
+
 def optimized_smoothing(df_col):
     '''
     Definition of a smoothing filter (Savitzky-Golay filter)
@@ -71,10 +85,7 @@ def optimized_smoothing(df_col):
         smooth_arr = savgol_filter(arr, winsize, 2)
 
         # calculate R^2
-        y_mean = sum(arr)/float(len(arr))
-        ss_tot = sum((yi-y_mean)**2 for yi in arr)
-        ss_err = sum((yi-fi)**2 for yi,fi in zip(arr, smooth_arr))
-        r2 = 1 - (ss_err/ss_tot)
+        r2 = r2_coeff(arr, smooth_arr)
     
         # define abort criterion
         if r2 > 0.91:
@@ -204,9 +215,6 @@ print('{0:4s}       {1:9s}      {2:9s}       {3:9s}'.format('Iter', ' c_Lu', ' c
 # Unconstrained minimization
 res = minimize(fun=obj_func, args=(df_mix_data['Smoothed'], df_Lu177m_data['Smoothed'], df_I131_data['Smoothed']), x0=xinit, method='BFGS',\
                tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
-# Bound-Constrained minimization 
-#res = minimize(fun=obj_func, args=(new_counts_mix_smooth, new_counts_lu_smooth, new_counts_iod_smooth), x0=xinit, method='L-BFGS-B',\
-#               bounds=bnds, tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
 
 # if factors smaller than 0 are set equal to zero
 if res.x[0] < 0:
@@ -219,11 +227,11 @@ print('\n---------------------------\n')
 print('Convergence Message:\n', res)
 
 #%%
-#
+# Lu177m: sum up all counts in energy window D and choose the correct CF
 cps_lu177m_winD = df_Lu177m_data['Smoothed'].mul(res.x[0]).iloc[dict_Lu177m_winD['Lu177m_min']-1:dict_Lu177m_winD['Lu177m_max']].sum() / dt_mix
 lu177m_factor = CF_lu177m_winD()
 
-# sum up all counts in energy window E and choose the correct CF
+# I131: sum up all counts in energy window E and choose the correct CF
 cps_iod_winE = df_I131_data['Smoothed'].mul(res.x[1]).iloc[dict_I131_winE['I131_min']-1:dict_I131_winE['I131_max']].sum() / dt_mix
 iod_factor = CF_iod_winE(cps_iod_winE)
 
@@ -267,48 +275,61 @@ print('Iod activity - window E [Bq]: {} (Simpson)'.format(round(Iod_act_simps, 2
 print('Iod activity - window E [Bq]: {} (Trapezoid)'.format(round(Iod_act_trapezoid, 2)))
 print('-----------------------------')
 
+# print the coefficient of determination (R^2)
+print('\n--- Coefficient Of Determination ---')
+print('R^2:', round(r2_coeff(df_mix_data['Smoothed'], df_Lu177m_data['Smoothed'].mul(res.x[0])+df_I131_data['Smoothed'].mul(res.x[1])), 3)) #new_counts_mix_smooth,(res.x[0]*new_counts_lu_smooth+res.x[1]*new_counts_iod_smooth
+print('------------------------------------')
+
 #%% plots
 
 # define plots
-fig1 = plt.figure(figsize=(16,15))
-ax1 = fig1.add_subplot(4,1,1)
-ax2 = fig1.add_subplot(4,1,2)
-ax3 = fig1.add_subplot(4,1,3)
-ax4 = fig1.add_subplot(4,1,4)
+fig, axs = plt.subplots(nrows=5, ncols=1, figsize=(16, 15))
 
-# 
-ax1.plot(df_Lu177_data.index * CF_Lu177, df_Lu177_data['Normalize'], label='[$^{177}$Lu]Lu spectrum')
-ax1.plot(df_Lu177m_data.index * CF_Lu177m, df_Lu177m_data['Normalize'], label='[$^{177m}$Lu]Lu spectrum')
-ax1.plot(df_Lu177_data.index * CF_Lu177, df_Lu177m_data['Normalize']-df_Lu177_data['Normalize'], label='[$^{177}$Lu]Lu - [$^{177m}$Lu]Lu spectrum')
-ax1.set_ylabel('$cts_i$ / $\sum_i(cts_i)$', fontsize=16)
-ax1.set_xticks(range(0,1000,50))
-ax1.legend(fancybox=True, framealpha=0.1, fontsize = 'large')
-ax1.text(0.01, 0.85, 'A', transform=ax1.transAxes, size=20, weight='bold')
+# spectra (normalized): comparison of Lu177m and Lu177
+axs[0].plot(df_Lu177m_data.index * CF_Lu177m, df_Lu177m_data['Normalize'], color='blue', label='[$^{177m}$Lu]Lu spectrum') 
+axs[0].plot(df_Lu177_data.index * CF_Lu177, df_Lu177_data['Normalize'], color='yellow', label='[$^{177}$Lu]Lu spectrum')
+axs[0].plot(df_Lu177_data.index * CF_Lu177, df_Lu177m_data['Normalize']-df_Lu177_data['Normalize'], color='red', label='[$^{177}$Lu]Lu - [$^{177m}$Lu]Lu spectrum')
+axs[0].set_ylabel('$cts_i$ / $\sum_i(cts_i)$', fontsize=16)
+axs[0].set_xticks(range(0,1000,50))
+axs[0].legend(fancybox=True, framealpha=0.1, fontsize = 'large')
+axs[0].text(0.01, 0.85, 'A', transform=axs[0].transAxes, size=20, weight='bold')
 
-# 
-ax2.plot(df_I131_data.index * CF_I131, df_I131_data['Normalize'], label='[$^{131}$I]I spectrum')
-ax2.set_ylabel('$cts_i$ / $\sum_i(cts_i)$', fontsize=16)
-ax2.set_xticks(range(0,1000,50))
-ax2.legend(fancybox=True, framealpha=0.1, fontsize = 'large')
-ax2.text(0.01, 0.85, 'B', transform=ax2.transAxes, size=20, weight='bold')
+# I131 spectrum (normalized)
+axs[1].plot(df_I131_data.index * CF_I131, df_I131_data['Normalize'], color='green', label='[$^{131}$I]I spectrum')
+axs[1].set_ylabel('$cts_i$ / $\sum_i(cts_i)$', fontsize=16)
+axs[1].set_xticks(range(0,1000,50))
+axs[1].legend(fancybox=True, framealpha=0.1, fontsize = 'large')
+axs[1].text(0.01, 0.85, 'B', transform=axs[1].transAxes, size=20, weight='bold')
 
-#
-ax3.plot(df_mix_data.index * CF_mix, df_mix_data['Total'], label='mix spectrum')
-ax3.plot(df_mix_data.index * CF_mix, df_mix_data['Smoothed'], label='smoothed spectrum')
-ax3.set_ylabel('cts', fontsize=16)
-ax3.set_xticks(range(0,1000,50))
-ax3.legend(fancybox=True, framealpha=0.1, fontsize = 'large')
-ax3.text(0.01, 0.85, 'C', transform=ax3.transAxes, size=20, weight='bold')
+# mixed spectrum (measured and smoothed)
+axs[2].plot(df_mix_data.index * CF_mix, df_mix_data['Total'], color='gray', label='mix spectrum')
+axs[2].plot(df_mix_data.index * CF_mix, df_mix_data['Smoothed'], color='orange', label='smoothed spectrum')
+axs[2].set_ylabel('cts', fontsize=16)
+axs[2].set_xticks(range(0,1000,50))
+axs[2].legend(fancybox=True, framealpha=0.1, fontsize = 'large')
+axs[2].text(0.01, 0.85, 'C', transform=axs[2].transAxes, size=20, weight='bold')
 
-# Lu + Iod (Calculated)
-ax4.plot(df_Lu177m_data.index * CF_Lu177m, df_Lu177m_data['Smoothed'].mul(res.x[0]), color='red', label='[$^{177m}$Lu]Lu Spektrum (berechnet+geglättet)')
-ax4.plot(df_I131_data.index * CF_I131, df_I131_data['Smoothed'].mul(res.x[1]), color='green', label='[$^{131}$I]I Spektrum (berechnet+geglättet)')
-ax4.plot(df_mix_data.index * CF_mix, (df_Lu177m_data['Smoothed'].mul(res.x[0])+df_I131_data['Smoothed'].mul(res.x[1])), color='black', label='[$^{177m}$Lu]Lu + [$^{131}$I]I')
-ax4.set_xlabel('Energy [keV]')
-ax4.set_xticks(range(0,1000,50))
-ax4.set_ylabel('cts', fontsize=16)
-ax4.legend(fancybox=True, framealpha=0.1, fontsize = 'large')
-ax4.text(0.01, 0.85, 'D', transform=ax4.transAxes, size=20, weight='bold')
+# spectra (calculated): Lu177m, I131 and Lu177m + I131
+axs[3].plot(df_Lu177m_data.index * CF_Lu177m, df_Lu177m_data['Smoothed'].mul(res.x[0]), color='blue', label='[$^{177m}$Lu]Lu Spektrum (berechnet)')
+axs[3].plot(df_I131_data.index * CF_I131, df_I131_data['Smoothed'].mul(res.x[1]), color='green', label='[$^{131}$I]I Spektrum (berechnet)')
+axs[3].plot(df_mix_data.index * CF_mix, (df_Lu177m_data['Smoothed'].mul(res.x[0])+df_I131_data['Smoothed'].mul(res.x[1])), color='black', label='[$^{177m}$Lu]Lu + [$^{131}$I]I')
+axs[3].set_xticks(range(0,1000,50))
+axs[3].set_ylabel('cts', fontsize=16)
+axs[3].legend(fancybox=True, framealpha=0.1, fontsize = 'large')
+axs[3].text(0.01, 0.85, 'D', transform=axs[3].transAxes, size=20, weight='bold')
+
+# spectra (smoothed): comparison of measured mixture and calculated one
+axs[4].plot(df_mix_data.index * CF_mix, df_mix_data['Smoothed'], color='orange', label='smoothed spectrum')
+axs[4].plot(df_mix_data.index * CF_mix, (df_Lu177m_data['Smoothed'].mul(res.x[0])+df_I131_data['Smoothed'].mul(res.x[1])), color='black', label='[$^{177m}$Lu]Lu + [$^{131}$I]I')
+axs[4].plot(df_mix_data.index * CF_mix, df_mix_data['Smoothed']-(df_Lu177m_data['Smoothed'].mul(res.x[0])+df_I131_data['Smoothed'].mul(res.x[1])), color='red', label='Diff')
+axs[4].set_xlabel('Energy [keV]')
+axs[4].set_xticks(range(0,1000,50))
+axs[4].set_ylabel('cts', fontsize=16)
+axs[4].legend(fancybox=True, framealpha=0.1, fontsize = 'large')
+axs[4].text(0.01, 0.85, 'E', transform=axs[4].transAxes, size=20, weight='bold')
+
+# automatically adjust the spacing between the subplots
+plt.tight_layout()
 
 # show plot
 plt.show()
