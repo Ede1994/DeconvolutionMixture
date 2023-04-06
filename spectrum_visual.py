@@ -60,13 +60,9 @@ def r2_coeff(arr1, arr2):
     Calculation of the coefficient of determination (R^2)
     '''
     y_mean = sum(arr1) / float(len(arr1))
-
     ss_tot = sum((yi - y_mean)**2 for yi in arr1)
-
     ss_err = sum((yi - fi)**2 for yi, fi in zip(arr1, arr2))
-
     r2 = 1 - (ss_err / ss_tot)
-
     return r2
 
 def optimized_smoothing(df_col):
@@ -97,20 +93,21 @@ def optimized_smoothing(df_col):
         
     return smooth_arr, winsize, r2
 
-def obj_func(x, counts_mix_smooth, counts_lu_smooth, counts_iod_smooth):
+def obj_func(x, df_mix, df_Lu177m, df_I131):
     '''
     objective function: Least square
     x is the array containing the wanted coefficients: c_lu, c_iod
     '''
-    y_pred = (x[0] * counts_lu_smooth) + (x[1] * counts_iod_smooth)
-    return np.sum((counts_mix_smooth - y_pred)**2)
+    y_pred = (x[0] * df_Lu177m['Smoothed']) + (x[1] * df_I131['Smoothed'])
+    leastSquares = np.sum((df_mix['Smoothed'] - y_pred)**2)
+    return leastSquares
 
 def callbackF(x):
     '''
     callback function for more scipy.optimize.minimize infos
     '''
     global Nfeval
-    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func(x, df_mix_data['Smoothed'], df_Lu177m_data['Smoothed'], df_I131_data['Smoothed'])))
+    print('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}'.format(Nfeval, x[0], x[1], obj_func(x, df_mix_data, df_Lu177m_data, df_I131_data)))
     Nfeval += 1
 
 def calc_activity(df_data, min_ch, max_ch, c, dt, CF):
@@ -161,6 +158,7 @@ def abw_spektr(name, df_path):
 
     # smoothed
     df_data['Smoothed'], winsize, r2 = optimized_smoothing(df_data['Total'])
+    df_data[df_data['Smoothed'] < 0] = 0
 
     print('\n---- {} ----'.format(name))
     print('CF spectrum {}: {}'.format(name, CF))
@@ -204,7 +202,7 @@ df_mix_data, CF_mix, dt_mix = abw_spektr('mix', data_path_mix)
 #%% Optimization
 Nfeval = 1
 # initial values
-xinit = np.array([0, 0])
+xinit = np.array([0., 0.])
 # bounds
 bnds = Bounds([0.0, 0.0], [1000000000., 1000000000.])
 
@@ -213,8 +211,12 @@ print('{0:4s}       {1:9s}      {2:9s}       {3:9s}'.format('Iter', ' c_Lu', ' c
 
 # optimize minimize
 # Unconstrained minimization
-res = minimize(fun=obj_func, args=(df_mix_data['Smoothed'], df_Lu177m_data['Smoothed'], df_I131_data['Smoothed']), x0=xinit, method='BFGS',\
-               tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
+res = minimize(fun=obj_func, args=(df_mix_data, df_Lu177m_data, df_I131_data), x0=xinit, method='BFGS',\
+               tol=0.00001, callback=callbackF, options={'maxiter':10000 ,'disp': True})
+
+# Bound-Constrained minimization 
+# res = minimize(fun=obj_func, args=(df_mix_data, df_Lu177m_data, df_I131_data), x0=xinit, method='L-BFGS-B',\
+#               bounds=bnds, tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
 
 # if factors smaller than 0 are set equal to zero
 if res.x[0] < 0:
@@ -247,6 +249,13 @@ for k, v in dict_Lu177m_winD.items():
 print('\nI131 - window E:')
 for k, v in dict_I131_winE.items():
     print('     {}: {}'.format(k, v))
+print('---------------------')
+
+# results of normalization; area should be 1
+print('\n--- No.of Channels ---')
+print('Lu177m spectrum:', len(df_Lu177m_data['Total']))
+print('I131 spectrum:', len(df_I131_data['Total']))
+print('Mix spectrum:', len(df_mix_data['Total']))
 print('---------------------')
 
 # results of normalization; area should be 1
