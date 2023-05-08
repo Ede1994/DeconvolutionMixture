@@ -35,6 +35,7 @@ dict_I131_winE =    {'I131_peak': 802,
 py_path = os.getcwd()
 
 data_path_lu177 = py_path + '/Data/Reference/AWM_Lu177_300Bq_3600s.csv'
+#data_path_lu177 = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
 data_path_lu177m = py_path + '/Data/Reference/AWM_Lu177m_7000Bq_3600s_040221.csv'
 data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
@@ -136,6 +137,10 @@ def abw_spektr(name, df_path):
 
     # get the index where the spectrum data begins
     idx = df.index[df[col_names[0]] == ';Spektrum;Nullspektrum']
+    # if df[col_names[0]] == ';Spektrum;Nullspektrum':
+    #     idx = df.index[df[col_names[0]] == ';Spektrum;Nullspektrum']
+    # elif df[col_names[0]] == ';Spektrum':
+    #     idx = df.index[df[col_names[0]] == ';Spektrum']
 
     # start to load the spectrum data, set col names and split
     df_data = df.iloc[idx[0]:, 0].str.split(';', expand=True)
@@ -219,10 +224,7 @@ res = minimize(fun=obj_func, args=(df_mix_data, df_Lu177m_data, df_I131_data), x
 #               bounds=bnds, tol=0.0001, callback=callbackF, options={'maxiter':1000 ,'disp': True})
 
 # if factors smaller than 0 are set equal to zero
-if res.x[0] < 0:
-    res.x[0] = 0
-if res.x[1] < 0:
-    res.x[1] = 0
+res.x[res.x < 0] = 0
 
 print('\n--- End Optimization ---')
 print('\n---------------------------\n')
