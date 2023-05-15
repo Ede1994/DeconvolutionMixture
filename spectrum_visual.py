@@ -35,8 +35,8 @@ dict_I131_winE =    {'I131_peak': 802,
 py_path = os.getcwd()
 
 data_path_lu177 = py_path + '/Data/Reference/AWM_Lu177_300Bq_3600s.csv'
-#data_path_lu177 = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
-data_path_lu177m = py_path + '/Data/Reference/AWM_Lu177m_7000Bq_3600s_040221.csv'
+data_path_lu177m = py_path + '/Data/Reference/AWM_Lu177m_10000Bq_300s_160920.csv'
+#data_path_lu177m = py_path + '/Data/Reference/AWM_Lu177m_7000Bq_3600s_040221.csv'
 data_path_iod = py_path + '/Data/Reference/AWM_I131_7000Bq_3600s_170221.csv'
 
 data_path_mix = py_path + '/Data/Mix_sample1/AWM_MIX_100vs100_3600s.csv'
@@ -134,13 +134,10 @@ def abw_spektr(name, df_path):
 
     # extract the measuring time
     dt = replace_and_convert(df.loc[df[col_names[0]] == 'Messzeit Spektrum (s)', col_names[1]].iloc[0])
+    print(dt)
 
     # get the index where the spectrum data begins
-    idx = df.index[df[col_names[0]] == ';Spektrum;Nullspektrum']
-    # if df[col_names[0]] == ';Spektrum;Nullspektrum':
-    #     idx = df.index[df[col_names[0]] == ';Spektrum;Nullspektrum']
-    # elif df[col_names[0]] == ';Spektrum':
-    #     idx = df.index[df[col_names[0]] == ';Spektrum']
+    idx = df.index[df[col_names[0]].str.contains(";Spektrum", case=False)]
 
     # start to load the spectrum data, set col names and split
     df_data = df.iloc[idx[0]:, 0].str.split(';', expand=True)
