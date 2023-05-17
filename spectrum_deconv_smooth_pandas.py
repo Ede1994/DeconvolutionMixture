@@ -210,7 +210,8 @@ Nfeval = 1
 
 # additional options for minimize function
 minimize_options = {'maxiter':10000 ,
-                    'disp': True
+                    'disp': True,
+                    'gtol': 1e-7 * len(df_mix_data['Spektrum'])
                     }
 
 # tolerance
@@ -225,7 +226,10 @@ print('{0:4s}       {1:9s}      {2:9s}       {3:9s}'.format('Iter', ' c_Lu', ' c
 
 # optimize minimize
 # Unconstrained minimization
-res = minimize(fun=obj_func, args=(df_mix_data, df_Lu177m_data, df_I131_data), x0=xinit, method='Nelder-Mead',\
+# res = minimize(fun=obj_func, args=(df_mix_data, df_Lu177m_data, df_I131_data), x0=xinit, method='Nelder-Mead',\
+#                tol=tolerance, callback=callbackF, options=minimize_options)
+
+res = minimize(fun=obj_func, args=(df_mix_data, df_Lu177m_data, df_I131_data), x0=xinit, method='BFGS',\
                tol=tolerance, callback=callbackF, options=minimize_options)
 
 # if factors smaller than 0 are set equal to zero
