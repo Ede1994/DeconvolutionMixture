@@ -19,8 +19,7 @@ A short description of the required additional packages and how to create an exe
 
 
 # Help
-You can find some background informations like mathematically basics in the folder [Background](/Background)!
-For more instructions how to use the programms read help.txt.
+You can find extra informations like mathematically basics in our publication related to this work [Paper](LINK!).
 
 
 # Data
@@ -31,5 +30,5 @@ Check the [Data](/Data) folder for several measured data sets of different sourc
 This software is distributed under an open source license, see LICENSE.txt for details.
 
 
-# Links
-- [GitHub](https://github.com/Ede1994/DeconvolutionMixture)
+# References/Links
+- [Paper](LINK!)
