@@ -21,6 +21,15 @@ A short description of the required additional packages and how to create an exe
 # Help
 You can find extra informations like mathematically basics in our publication related to this work [Paper](LINK!).
 
+## Instruction
+Command line (.py):
+- bla bla
+
+GUI (.py):
+- the reference (pure) spectra are fixed -> you can change this in the source code, if necessary
+- Use the "Import Data"-Button to import AND load specific data files (you can also write the PATH in the entry box by hand)
+- Change the measuring time (default = 3600s)
+- Press the "Spectrum Deconvolution"-Button to start the calculations
 
 # Data
 Check the [Data](/Data) folder for several measured data sets of different sources for tests.
